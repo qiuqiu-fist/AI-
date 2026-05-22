@@ -1,0 +1,21 @@
+{
+  "name": "novel-writer",
+  "version": "1.0.0",
+  "description": "AI 辅助小说写作桌面应用",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && PYENV_VERSION=3.12.13 uvicorn app.main:app --reload --host 127.0.0.1 --port 8765",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:frontend": "cd frontend && npm run build",
+    "electron:install": "ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ node node_modules/electron/install.js",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  }
+}
