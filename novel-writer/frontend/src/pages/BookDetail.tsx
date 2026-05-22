@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Card, Button, Table, Tag, Space, Form, Input, Select, Switch, TimePicker, InputNumber,
+  Card, Button, Table, Tag, Space, Form, Input, Select, Switch, TimePicker,
   Tabs, message, Spin, Row, Col, Modal,
 } from 'antd'
 import dayjs from 'dayjs'
@@ -177,14 +177,73 @@ export default function BookDetail() {
                 {generating ? '生成中...' : '生成下一章'}
               </Button>
               {generating && generationStatus && (
-                <span style={{ color: '#1890ff', fontSize: '12px' }}>
-                  {generationStatus.message}
-                </span>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  background: 'linear-gradient(135deg, #eef2ff, #f0fdfa)',
+                  border: '1px solid #c7d2fe', borderRadius: 10,
+                  padding: '8px 14px', marginRight: 12,
+                }}>
+                  <div style={{
+                    width: 20, height: 20,
+                    border: '2px solid #eef2ff', borderTopColor: '#6366f1',
+                    borderRadius: '50%', animation: 'spin 0.8s linear infinite',
+                  }} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: '#4f46e5' }}>正在生成...</div>
+                    <div style={{ fontSize: 12, color: '#64748b' }}>{generationStatus?.message || 'AI 正在创作中'}</div>
+                  </div>
+                </div>
               )}
               <Button onClick={handleExportAll}>导出全书</Button>
             </Space>
           }>
-            <Table dataSource={chapters} columns={chapterColumns} rowKey="id" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {chapters.map((ch) => (
+                <div
+                  key={ch.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '14px 16px', background: '#fff', borderRadius: 10,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    cursor: 'pointer', transition: 'all 0.2s',
+                    borderLeft: `3px solid ${ch.status === 'exported' ? '#10b981' : '#6366f1'}`,
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.transform = 'translateX(4px)'
+                    ;(e.currentTarget as HTMLElement).style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.08)'
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.transform = 'none'
+                    ;(e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: '#eef2ff', color: '#6366f1',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700, fontSize: 13,
+                    flexShrink: 0, transition: 'all 0.2s',
+                  }}>
+                    {String(ch.chapter_number || (chapters.indexOf(ch) + 1)).padStart(2, '0')}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: '#1e293b' }}>{ch.title || `第 ${ch.chapter_number || chapters.indexOf(ch) + 1} 章`}</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 12 }}>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', padding: '2px 10px',
+                        borderRadius: 20, fontSize: 12, fontWeight: 500,
+                        background: ch.status === 'exported' ? '#d1fae5' : '#dbeafe',
+                        color: ch.status === 'exported' ? '#065f46' : '#1e40af',
+                      }}>
+                        {ch.status === 'exported' ? '已导出' : '已生成'}
+                      </span>
+                      <span>📏 {ch.word_count || 0} 字</span>
+                      <span>📅 {ch.created_at ? new Date(ch.created_at).toLocaleDateString() : '-'}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </Card>
         </Col>
         <Col span={8}>
@@ -215,10 +274,11 @@ export default function BookDetail() {
               <Form.Item name="schedule_time" label="定时时间">
                 <TimePicker format="HH:mm" />
               </Form.Item>
-              <Form.Item name="daily_chapters" label="每天生成章数">
-                <InputNumber min={1} max={10} defaultValue={1} style={{ width: '100%' }} />
-              </Form.Item>
             </Form>
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, fontSize: 13, color: '#065f46' }}>
+              <span>●</span>
+              今日已生成 0 章
+            </div>
           </Card>
         </Col>
       </Row>
