@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Novel Writer - UI 设计方案预览</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+    }
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --primary-light: #eef2ff;
+      --secondary: #06b6d4;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --text-secondary: #64748b;
+      --border: #e2e8f0;
+      --sidebar-bg: #1e1b4b;
+      --sidebar-text: #c7d2fe;
+      --sidebar-active: #6366f1;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+    }
+    .hero {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%);
+      padding: 60px 0 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(99,102,241,0.15) 0%, transparent 60%),
+                  radial-gradient(circle at 70% 50%, rgba(6,182,212,0.1) 0%, transparent 60%);
+      animation: float 20s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      33% { transform: translate(30px, -30px) rotate(1deg); }
+      66% { transform: translate(-20px, 20px) rotate(-1deg); }
+    }
+    .hero-content { position: relative; z-index: 1; }
+    .hero h1 { color: white; font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    .hero p { color: #a5b4fc; font-size: 1.1rem; margin-top: 12px; max-width: 600px; margin-inline: auto; }
+
+    .section { padding: 48px 0; }
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-bottom: 32px;
+    }
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+    /* Cards */
+    .design-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .design-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+    .card-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-body { padding: 24px; }
+
+    /* Color swatches */
+    .color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
+    .color-swatch { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+    .color-display { height: 80px; display: flex; align-items: flex-end; padding: 8px; }
+    .color-label { padding: 8px 12px; background: white; font-size: 0.8rem; }
+    .color-label .name { font-weight: 600; color: var(--text); }
+    .color-label .hex { color: var(--text-secondary); font-family: monospace; }
+
+    /* Sidebar preview */
+    .sidebar-preview {
+      width: 240px;
+      background: var(--sidebar-bg);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+    .sidebar-header {
+      padding: 20px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sidebar-logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .sidebar-header-text { color: white; font-weight: 600; font-size: 1rem; }
+    .sidebar-menu { padding: 8px; }
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--sidebar-text);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-bottom: 2px;
+    }
+    .sidebar-item:hover { background: rgba(255,255,255,0.08); color: white; }
+    .sidebar-item.active { background: var(--sidebar-active); color: white; font-weight: 500; }
+    .sidebar-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+    /* Stat cards */
+    .stat-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card .icon-bg {
+      position: absolute;
+      right: -10px;
+      top: -10px;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      opacity: 0.1;
+    }
+    .stat-label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text); }
+    .stat-trend { font-size: 0.8rem; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+    .stat-trend.up { color: var(--success); }
+    .stat-trend.down { color: var(--danger); }
+
+    /* Table redesign */
+    .table-demo { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; }
+    .table-demo th {
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 2px solid var(--border);
+    }
+    .table-demo td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+    .table-demo tr:hover td { background: #f8fafc; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .tag-green { background: #d1fae5; color: #065f46; }
+    .tag-blue { background: #dbeafe; color: #1e40af; }
+    .tag-orange { background: #fef3c7; color: #92400e; }
+    .tag-purple { background: #ede9fe; color: #5b21b6; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline { background: white; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-ghost { background: transparent; color: var(--text-secondary); }
+    .btn-ghost:hover { background: #f1f5f9; color: var(--text); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+    .btn-icon {
+      width: 32px; height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+    }
+
+    /* Layout preview */
+    .layout-preview {
+      display: flex;
+      gap: 24px;
+      background: var(--bg);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .layout-sidebar {
+      width: 220px;
+      flex-shrink: 0;
+    }
+    .layout-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .layout-toolbar {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 8px 12px;
+      width: 280px;
+    }
+    .search-bar input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 0.85rem;
+      width: 100%;
+      color: var(--text);
+    }
+    .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* Progress bar */
+    .progress-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--secondary));
+      transition: width 0.5s ease;
+    }
+
+    /* Tabs redesign */
+    .tabs-demo {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .tab-item {
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
+    }
+    .tab-item:hover { color: var(--text); }
+    .tab-item.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* Grid */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+    /* Chapter card */
+    .chapter-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: var(--card);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+    .chapter-card:hover {
+      transform: translateX(4px);
+      box-shadow: var(--shadow-lg);
+    }
+    .chapter-number {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .chapter-info { flex: 1; }
+    .chapter-title { font-weight: 600; font-size: 0.95rem; color: var(--text); }
+    .chapter-meta { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; display: flex; gap: 12px; }
+    .chapter-actions { display: flex; gap: 6px; }
+
+    /* Editor preview */
+    .editor-preview {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .editor-toolbar {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .editor-toolbar .divider {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+    .editor-content {
+      padding: 32px 40px;
+      min-height: 300px;
+      line-height: 1.9;
+      font-size: 1rem;
+      color: var(--text);
+    }
+    .editor-content h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 16px; color: #1a1a2e; }
+    .editor-content p { margin-bottom: 12px; }
+    .editor-content p:last-child { margin-bottom: 0; }
+
+    /* Timeline */
+    .timeline { position: relative; padding-left: 24px; }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 4px;
+      bottom: 4px;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-item { position: relative; padding-bottom: 20px; }
+    .timeline-item:last-child { padding-bottom: 0; }
+    .timeline-dot {
+      position: absolute;
+      left: -20px;
+      top: 4px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--primary);
+      background: white;
+    }
+    .timeline-dot.success { border-color: var(--success); background: #d1fae5; }
+    .timeline-dot.failed { border-color: var(--danger); background: #fee2e2; }
+    .timeline-content { font-size: 0.9rem; }
+    .timeline-content .time { font-size: 0.8rem; color: var(--text-secondary); }
+
+    /* Feature comparison */
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .comparison-col {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .comparison-header {
+      padding: 16px 20px;
+      font-weight: 600;
+      font-size: 1rem;
+      text-align: center;
+    }
+    .comparison-header.before { background: #f1f5f9; color: var(--text-secondary); }
+    .comparison-header.after { background: var(--primary-light); color: var(--primary); }
+    .comparison-body { padding: 20px; }
+    .comparison-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .comparison-item:last-child { border-bottom: none; }
+    .icon-check { color: var(--success); }
+    .icon-x { color: var(--danger); }
+    .icon-plus { color: var(--primary); }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .empty-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 16px;
+      background: var(--primary-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .empty-state h3 { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+    .empty-state p { color: var(--text-secondary); font-size: 0.9rem; max-width: 360px; margin: 0 auto 20px; }
+
+    /* Notification toast */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast-item {
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      animation: slideIn 0.3s ease;
+    }
+    .toast-item.success { border-left: 3px solid var(--success); }
+    .toast-item.error { border-left: 3px solid var(--danger); }
+    .toast-item.info { border-left: 3px solid var(--primary); }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Input design */
+    .input-demo {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: all 0.15s;
+      background: white;
+    }
+    .input-demo:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+
+    @media (max-width: 768px) {
+      .grid-2, .grid-3, .grid-4, .comparison-grid { grid-template-columns: 1fr; }
+      .layout-preview { flex-direction: column; }
+      .layout-sidebar { width: 100%; }
+    }
+
+    .nav-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 40px;
+    }
+    .nav-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .nav-dot.active { background: var(--primary); width: 28px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="hero-content">
+    <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.1);padding:4px 14px;border-radius:20px;color:#a5b4fc;font-size:0.85rem;margin-bottom:16px;">
+      <span>✦</span> UI 优化设计方案 v2.0
+    </div>
+    <h1>AI Novel Writer · 全新界面设计</h1>
+    <p>更优雅的视觉体验、更流畅的操作流程、更专业的创作工具</p>
+    <div style="margin-top: 20px; display: flex; justify-content: center; gap: 12px;">
+      <span style="color:#a5b4fc;font-size:0.9rem;">🎨 设计系统</span>
+      <span style="color:#a5b4fc;font-size:0.9rem;">📐 布局重构</span>
+      <span style="color:#a5b4fc;font-size:0.9rem;">✨ 体验升级</span>
+    </div>
+  </div>
+</div>
+
+<div class="container" style="margin-top: -40px; position: relative; z-index: 2;">
+
+  <!-- Section 1: Design System -->
+  <div class="section">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+      <span class="section-badge">01</span>
+      <h2 class="section-title">设计系统</h2>
+    </div>
+    <p class="section-subtitle">统一的色彩、间距、字体和组件风格，为整个应用提供一致的设计语言。</p>
+
+    <div class="design-card">
+      <div class="card-header">
+        <span style="font-weight:600;">配色方案</span>
+        <span style="font-size:0.8rem;color:var(--text-secondary);">基于 Indigo + Cyan 的专业创作色调</span>
+      </div>
+      <div class="card-body">
+        <div class="color-grid">
+          <div class="color-swatch">
+            <div class="color-display" style="background:#6366f1;"></div>
+            <div class="color-label"><div class="name">Primary</div><div class="hex">#6366F1</div></div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-display" style="background:#4f46e5;"></div>
+            <div class="color-label"><div class="name">Primary Dark</div><div class="hex">#4F46E5</div></div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-display" style="background:#eef2ff;"></div>
+            <div class="color-label"><div class="name">Primary Light</div><div class="hex">#EEF2FF</div></div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-display" style="background:#06b6d4;"></div>
+            <div class="color-label"><div class="name">Secondary</div><div class="hex">#06B6D4</div></div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-display" style="background:#10b981;"></div>
+            <div class="color-label"><div class="name">Success</div><div class="hex">#10B981</div></div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-display" style="background:#f59e0b;"></div>
+            <div class="color-label"><div class="name">Warning</div><div class="hex">#F59E0B</div></div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-display" style="background:#ef4444;"></div>
+            <div class="color-label"><div class="name">Danger</div><div class="hex">#EF4444</div></div>
+          </div>
+          <div class="color-swatch">
+            <div class="color-display" style="background:#1e1b4b;"></div>
+            <div class="color-label"><div class="name">Sidebar</div><div class="hex">#1E1B4B</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;">
+      <div class="design-card">
+        <div class="card-header">
+          <span style="font-weight:600;">字体与排版</span>
+        </div>
+        <div class="card-body">
+          <div style="margin-bottom:16px;">
+            <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:4px;">标题</div>
+            <div style="font-size:1.5rem;font-weight:700;">Inter Semi Bold</div>
+          </div>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:4px;">正文</div>
+            <div style="font-size:1rem;font-weight:400;line-height:1.7;">Inter Regular · 阅读体验优先，行高 1.7</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:4px;">辅助文本</div>
+            <div style="font-size:0.85rem;font-weight:400;color:var(--text-secondary);">用于描述、元数据等次要信息</div>
+          </div>
+        </div>
+      </div>
+      <div class="design-card">
+        <div class="card-header">
+          <span style="font-weight:600;">圆角与阴影</span>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div style="width:60px;height:60px;background:var(--primary-light);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--primary);">6px</div>
+            <div style="width:60px;height:60px;background:var(--primary-light);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--primary);">10px</div>
+            <div style="width:60px;height:60px;background:var(--primary-light);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--primary);">12px</div>
+            <div style="width:60px;height:60px;background:var(--primary-light);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--primary);">16px</div>
+            <div style="width:60px;height:60px;background:var(--primary-light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--primary);">圆形</div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:16px;">
+            <div style="width:100px;height:40px;border-radius:8px;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--text-secondary);">shadow-sm</div>
+            <div style="width:100px;height:40px;border-radius:8px;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:var(--text-secondary);">shadow-lg</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 2: Layout Redesign -->
+  <div class="section">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+      <span class="section-badge">02</span>
+      <h2 class="section-title">布局重构</h2>
+    </div>
+    <p class="section-subtitle">全新的侧边栏设计、顶部工具栏、以及更合理的内容区域布局。</p>
+
+    <div class="layout-preview">
+      <div class="layout-sidebar">
+        <div class="sidebar-preview" style="width:100%;">
+          <div class="sidebar-header">
+            <div class="sidebar-logo">NW</div>
+            <span class="sidebar-header-text">Novel Writer</span>
+          </div>
+          <div class="sidebar-menu">
+            <div class="sidebar-item active">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              仪表盘
+            </div>
+            <div class="sidebar-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+              我的项目
+            </div>
+            <div class="sidebar-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              AI 来源
+            </div>
+            <div class="sidebar-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              生成历史
+            </div>
+            <div class="sidebar-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              设置
+            </div>
+          </div>
+          <div style="padding:12px;border-top:1px solid rgba(255,255,255,0.08);">
+            <div class="sidebar-item" style="font-size:0.8rem;color:rgba(199,210,254,0.6);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              退出
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="layout-main">
+        <div class="layout-toolbar">
+          <div style="font-weight:600;font-size:1rem;">仪表盘</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="search-bar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" placeholder="搜索项目、章节...">
+            </div>
+            <button class="btn btn-icon btn-outline" style="border:none;background:#f1f5f9;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+            </button>
+            <div class="avatar">A</div>
+          </div>
+        </div>
+        <div style="background:var(--card);border-radius:10px;padding:32px 40px;box-shadow:var(--shadow);text-align:center;">
+          <div style="font-size:0.85rem;color:var(--text-secondary);">主要内容区域</div>
+          <div style="font-weight:600;margin-top:4px;">整洁 · 通透 · 专注创作</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 3: Dashboard -->
+  <div class="section">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+      <span class="section-badge">03</span>
+      <h2 class="section-title">仪表盘 · 数据概览</h2>
+    </div>
+    <p class="section-subtitle">更具视觉冲击力的数据卡片，加上进度趋势和最近活动时间线。</p>
+
+    <div class="grid-4">
+      <div class="stat-card">
+        <div class="icon-bg" style="background:#6366f1;"></div>
+        <div class="stat-label">书籍总数</div>
+        <div class="stat-value">12</div>
+        <div class="stat-trend up">↑ 3 本月新增</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon-bg" style="background:#06b6d4;"></div>
+        <div class="stat-label">章节总数</div>
+        <div class="stat-value">248</div>
+        <div class="stat-trend up">↑ 28 本周生成</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon-bg" style="background:#f59e0b;"></div>
+        <div class="stat-label">定时任务</div>
+        <div class="stat-value">5</div>
+        <div class="stat-trend up">● 3 进行中</div>
+      </div>
+      <div class="stat-card">
+        <div class="icon-bg" style="background:#10b981;"></div>
+        <div class="stat-label">总字数</div>
+        <div class="stat-value">52.6K</div>
+        <div class="stat-trend up">↑ 日均 2.1K</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:24px;margin-top:24px;">
+      <div class="design-card">
+        <div class="card-header">
+          <span style="font-weight:600;">📚 最近项目</span>
+          <button class="btn btn-sm btn-outline">查看全部</button>
+        </div>
+        <div class="card-body" style="padding:0;">
+          <table class="table-demo">
+            <thead>
+              <tr><th>书名</th><th>进度</th><th>章节</th><th>每日章数</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight:500;">星辰之海</td>
+                <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="flex:1;max-width:120px;"><div class="progress-fill" style="width:65%;"></div></div><span style="font-size:0.8rem;color:var(--text-secondary);">65%</span></div></td>
+                <td><span class="tag tag-blue">24章</span></td>
+                <td>2章/天</td>
+                <td><button class="btn btn-sm btn-primary">进入</button></td>
+              </tr>
+              <tr>
+                <td style="font-weight:500;">异能觉醒</td>
+                <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="flex:1;max-width:120px;"><div class="progress-fill" style="width:40%;"></div></div><span style="font-size:0.8rem;color:var(--text-secondary);">40%</span></div></td>
+                <td><span class="tag tag-blue">18章</span></td>
+                <td>1章/天</td>
+                <td><button class="btn btn-sm btn-primary">进入</button></td>
+              </tr>
+              <tr>
+                <td style="font-weight:500;">魔法纪元</td>
+                <td><div style="display:flex;align-items:center;gap:8px;"><div class="progress-bar" style="flex:1;max-width:120px;"><div class="progress-fill" style="width:80%;"></div></div><span style="font-size:0.8rem;color:var(--text-secondary);">80%</span></div></td>
+                <td><span class="tag tag-green">36章</span></td>
+                <td>3章/天</td>
+                <td><button class="btn btn-sm btn-primary">进入</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="design-card">
+        <div class="card-header">
+          <span style="font-weight:600;">⏱ 最近活动</span>
+        </div>
+        <div class="card-body">
+          <div class="timeline">
+            <div class="timeline-item">
+              <div class="timeline-dot success"></div>
+              <div class="timeline-content">
+                <div style="font-weight:500;">星辰之海 · 第24章 生成成功</div>
+                <div class="time">10 分钟前 · 2187 字</div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-dot success"></div>
+              <div class="timeline-content">
+                <div style="font-weight:500;">异能觉醒 · 第18章 生成成功</div>
+                <div class="time">32 分钟前 · 1956 字</div>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-dot" style="border-color:var(--f59e0b);"></div>
+              <div class="timeline-content">
+                <div style="font-weight:500;">魔法纪元 · 定时任务即将执行</div>
+                <div class="time">14:00 自动生成 3 章</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 4: Book Detail -->
+  <div class="section">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+      <span class="section-badge">04</span>
+      <h2 class="section-title">项目详情 · 全新布局</h2>
+    </div>
+    <p class="section-subtitle">左章节列表 + 右设置面板，底部主题配置改为集成式 Tab 设计。</p>
+
+    <div style="display:flex;gap:24px;">
+      <div style="flex:1;">
+        <div class="design-card">
+          <div class="card-header">
+            <span style="font-weight:600;">📖 章节列表</span>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-sm btn-outline">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                导出全书
+              </button>
+              <button class="btn btn-sm btn-primary" style="display:flex;align-items:center;gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                生成下一章
+              </button>
+            </div>
+          </div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:8px;padding:16px;">
+            <div class="chapter-card">
+              <div class="chapter-number">01</div>
+              <div class="chapter-info">
+                <div class="chapter-title">序章 · 星辰的召唤</div>
+                <div class="chapter-meta">
+                  <span>📝 已生成</span>
+                  <span>📏 2356 字</span>
+                  <span>📅 2026-05-22</span>
+                </div>
+              </div>
+              <div class="chapter-actions">
+                <button class="btn btn-sm btn-ghost">查看</button>
+                <button class="btn btn-sm btn-ghost">导出</button>
+              </div>
+            </div>
+            <div class="chapter-card">
+              <div class="chapter-number">02</div>
+              <div class="chapter-info">
+                <div class="chapter-title">初入异界</div>
+                <div class="chapter-meta">
+                  <span>📝 已生成</span>
+                  <span>📏 1892 字</span>
+                  <span>📅 2026-05-22</span>
+                </div>
+              </div>
+              <div class="chapter-actions">
+                <button class="btn btn-sm btn-ghost">查看</button>
+                <button class="btn btn-sm btn-ghost">导出</button>
+              </div>
+            </div>
+            <div class="chapter-card" style="opacity:0.5;">
+              <div class="chapter-number" style="background:#f1f5f9;color:#94a3b8;">03</div>
+              <div class="chapter-info">
+                <div class="chapter-title" style="color:#94a3b8;">（等待生成）</div>
+                <div class="chapter-meta">
+                  <span>⏳ 排队中</span>
+                </div>
+              </div>
+              <div class="chapter-actions"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="width:320px;flex-shrink:0;">
+        <div class="design-card">
+          <div class="card-header">
+            <span style="font-weight:600;">⚙️ 项目设置</span>
+            <button class="btn btn-sm btn-primary">保存</button>
+          </div>
+          <div class="card-body">
+            <div style="margin-bottom:16px;">
+              <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">书名</label>
+              <input class="input-demo" value="星辰之海">
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">作者</label>
+              <input class="input-demo" value="佚名">
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">简介</label>
+              <textarea class="input-demo" rows="2" style="resize:vertical;">一段关于星辰与命运的奇幻之旅...</textarea>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">输出格式</label>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-sm btn-primary">Markdown</button>
+                <button class="btn btn-sm btn-outline">纯文本</button>
+                <button class="btn btn-sm btn-outline">Word</button>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;">
+              <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">定时生成</label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <div style="width:40px;height:22px;background:var(--primary);border-radius:11px;position:relative;cursor:pointer;">
+                  <div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;right:2px;top:2px;"></div>
+                </div>
+                <input class="input-demo" style="width:80px;" value="09:00">
+                <span style="font-size:0.85rem;color:var(--text-secondary);">每天</span>
+                <input class="input-demo" style="width:60px;" value="2">
+                <span style="font-size:0.85rem;color:var(--text-secondary);">章</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="design-card" style="margin-top:24px;">
+      <div class="card-header">
+        <span style="font-weight:600;">🎨 主题配置</span>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-sm btn-primary">保存</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0 24px 24px;">
+        <div class="tabs-demo">
+          <div class="tab-item active">基础设定</div>
+          <div class="tab-item">故事大纲</div>
+          <div class="tab-item">世界观</div>
+          <div class="tab-item">角色设定</div>
+          <div class="tab-item">写作风格</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div>
+            <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">小说类型</label>
+            <input class="input-demo" placeholder="玄幻、科幻、言情..." value="玄幻">
+          </div>
+          <div>
+            <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">写作风格</label>
+            <input class="input-demo" placeholder="中国古典仙侠..." value="中国古典仙侠">
+          </div>
+          <div>
+            <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">语调</label>
+            <input class="input-demo" placeholder="轻松、严肃..." value="轻松">
+          </div>
+          <div>
+            <label style="font-size:0.85rem;font-weight:500;color:var(--text);display:block;margin-bottom:6px;">目标字数/章</label>
+            <input class="input-demo" placeholder="2000" value="2000">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 5: Chapter Editor -->
+  <div class="section">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+      <span class="section-badge">05</span>
+      <h2 class="section-title">章节编辑器 · 沉浸式阅读</h2>
+    </div>
+    <p class="section-subtitle">富文本工具栏、自动保存、字数统计，带来类似 Notion 的编辑体验。</p>
+
+    <div class="editor-preview">
+      <div class="editor-toolbar">
+        <button class="btn btn-sm btn-ghost btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>
+        <button class="btn btn-sm btn-ghost btn-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <div class="divider"></div>
+        <button class="btn btn-sm btn-ghost btn-icon"><strong>B</strong></button>
+        <button class="btn btn-sm btn-ghost btn-icon"><em>I</em></button>
+        <button class="btn btn-sm btn-ghost btn-icon"><u>U</u></button>
+        <div class="divider"></div>
+        <button class="btn btn-sm btn-ghost btn-icon" style="font-size:0.8rem;">H1</button>
+        <button class="btn btn-sm btn-ghost btn-icon" style="font-size:0.75rem;">H2</button>
+        <div style="flex:1;"></div>
+        <span style="font-size:0.8rem;color:var(--text-secondary);">已自动保存</span>
+        <span style="font-size:0.8rem;color:var(--text-secondary);">|</span>
+        <span style="font-size:0.8rem;color:var(--text-secondary);">1,892 字</span>
+        <div class="divider"></div>
+        <button class="btn btn-sm btn-outline">预览</button>
+        <button class="btn btn-sm btn-primary">保存</button>
+        <button class="btn btn-sm btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+          重新生成
+        </button>
+      </div>
+      <div class="editor-content">
+        <h2>第一章 · 初入异界</h2>
+        <p>阳光透过繁茂的树叶洒落下来，在地面上投下斑驳的光影。林轩睁开眼睛，映入眼帘的是一片完全陌生的天空——那是一种深邃的紫蓝色，点缀着两轮明月。</p>
+        <p>"这里……是哪里？"他低声呢喃着，坐起身来。记忆还停留在原本的世界，那场突如其来的地震，然后……</p>
+        <p>一阵细微的脚步声打断了林轩的思绪。他警惕地看向声音传来的方向，只见一个身穿青衫的少女正站在不远处，好奇地打量着他。</p>
+        <p>"你醒了？"少女的声音清脆悦耳，"这里是青云山脉的外围，我在采药时发现了你。"</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 6: Improvements Summary -->
+  <div class="section">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+      <span class="section-badge">06</span>
+      <h2 class="section-title">优化前后对比</h2>
+    </div>
+    <p class="section-subtitle">从基础功能到专业创作工具的全面升级。</p>
+
+    <div class="comparison-grid">
+      <div class="comparison-col">
+        <div class="comparison-header before">优化前</div>
+        <div class="comparison-body">
+          <div class="comparison-item"><span class="icon-x" style="color:var(--danger);">✗</span> Ant Design 默认样式，缺乏品牌特色</div>
+          <div class="comparison-item"><span class="icon-x" style="color:var(--danger);">✗</span> 侧边栏白色背景，视觉层次不明显</div>
+          <div class="comparison-item"><span class="icon-x" style="color:var(--danger);">✗</span> 仪表盘仅有文字数字，缺少可视化元素</div>
+          <div class="comparison-item"><span class="icon-x" style="color:var(--danger);">✗</span> 章节列表为普通表格，交互单一</div>
+          <div class="comparison-item"><span class="icon-x" style="color:var(--danger);">✗</span> 编辑器中纯文本输入，无工具栏</div>
+          <div class="comparison-item"><span class="icon-x" style="color:var(--danger);">✗</span> 无搜索功能、无全局工具栏</div>
+          <div class="comparison-item"><span class="icon-x" style="color:var(--danger);">✗</span> 空状态无友好提示</div>
+          <div class="comparison-item"><span class="icon-x" style="color:var(--danger);">✗</span> 不响应式，移动端体验差</div>
+        </div>
+      </div>
+      <div class="comparison-col">
+        <div class="comparison-header after">优化后</div>
+        <div class="comparison-body">
+          <div class="comparison-item"><span class="icon-check">✓</span> Indigo + Cyan 专业品牌色系统</div>
+          <div class="comparison-item"><span class="icon-check">✓</span> 深色侧边栏 + 渐变色 Logo，层次分明</div>
+          <div class="comparison-item"><span class="icon-check">✓</span> 统计卡片带趋势指标、进度条可视化</div>
+          <div class="comparison-item"><span class="icon-check">✓</span> 卡片式章节列表，悬停动效</div>
+          <div class="comparison-item"><span class="icon-check">✓</span> 富文本工具栏、自动保存、字数统计</div>
+          <div class="comparison-item"><span class="icon-check">✓</span> 顶部搜索栏 + 通知中心</div>
+          <div class="comparison-item"><span class="icon-check">✓</span> 插画风格的空状态引导</div>
+          <div class="comparison-item"><span class="icon-check">✓</span> 完全响应式，移动端自适应</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div style="text-align:center;padding:48px 24px;color:var(--text-secondary);font-size:0.9rem;border-top:1px solid var(--border);margin-top:48px;">
+  <div style="font-weight:600;color:var(--text);margin-bottom:4px;">AI Novel Writer · UI Design Proposal</div>
+  <div>以上为设计方案预览，具体实现可能会根据技术可行性进行调整</div>
+  <div class="nav-dots">
+    <div class="nav-dot active"></div>
+    <div class="nav-dot"></div>
+    <div class="nav-dot"></div>
+    <div class="nav-dot"></div>
+    <div class="nav-dot"></div>
+    <div class="nav-dot"></div>
+  </div>
+</div>
+
+</body>
+</html>
