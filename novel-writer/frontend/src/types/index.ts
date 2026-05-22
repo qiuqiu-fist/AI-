@@ -8,6 +8,7 @@ export interface Book {
   output_format: 'md' | 'txt' | 'docx'
   schedule_enabled: boolean
   schedule_time: string
+  daily_chapters: number
   theme_config: ThemeConfig
   created_at: string
   updated_at: string
