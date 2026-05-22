@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, BrowserRouter } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { ConfigProvider } from 'antd'
 import AppLayout from './components/AppLayout'
 import Dashboard from './pages/Dashboard'
@@ -22,20 +22,18 @@ export default function App() {
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
       },
     }}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<AppLayout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="books" element={<BookList />} />
-            <Route path="books/:bookId" element={<BookDetail />} />
-            <Route path="books/:bookId/chapters/:chapterId" element={<ChapterEditor />} />
-            <Route path="providers" element={<ProviderManage />} />
-            <Route path="history" element={<History />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="books" element={<BookList />} />
+          <Route path="books/:bookId" element={<BookDetail />} />
+          <Route path="books/:bookId/chapters/:chapterId" element={<ChapterEditor />} />
+          <Route path="providers" element={<ProviderManage />} />
+          <Route path="history" element={<History />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+      </Routes>
     </ConfigProvider>
   )
 }
