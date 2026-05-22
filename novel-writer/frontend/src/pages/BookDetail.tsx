@@ -7,7 +7,7 @@ import {
 import dayjs from 'dayjs'
 import { bookApi } from '../api/books'
 import { chapterApi, GenerationStatus } from '../api/chapters'
-import { Book, Chapter } from '../types'
+import { Book, Chapter, Character } from '../types'
 
 export default function BookDetail() {
   const { bookId } = useParams()
@@ -332,16 +332,42 @@ export default function BookDetail() {
           {
             key: 'characters', label: '角色设定',
             children: (
-              <Form.Item label="角色列表（JSON 格式）">
+              <Form.Item label="角色列表（每行一个角色，用 --- 分隔）"
+                help="格式：姓名：xxx | 身份：xxx | 描述：xxx">
                 <Input.TextArea rows={8}
-                  value={JSON.stringify(book.theme_config?.characters || [], null, 2)}
+                  value={(() => {
+                    const chars = book.theme_config?.characters
+                    if (!chars || !Array.isArray(chars) || chars.length === 0) return ''
+                    return chars.map(c =>
+                      `姓名：${c.name || ''}\n身份：${c.role || ''}\n描述：${c.description || ''}`
+                    ).join('\n---\n')
+                  })()}
                   onChange={(e) => {
-                    try {
-                      const chars = JSON.parse(e.target.value)
-                      setBook({ ...book, theme_config: { ...book.theme_config, characters: chars } })
-                    } catch { /* ignore */ }
+                    const text = e.target.value.trim()
+                    if (!text) {
+                      setBook({ ...book, theme_config: { ...book.theme_config, characters: [] } })
+                      return
+                    }
+                    const blocks = text.split(/---+/).map(b => b.trim()).filter(Boolean)
+                    const chars = blocks.map(block => {
+                      const lines = block.split('\n').map(l => l.trim()).filter(Boolean)
+                      const char: Record<string, string> = {}
+                      for (const line of lines) {
+                        const sep = line.includes('：') ? '：' : ':'
+                        const idx = line.indexOf(sep)
+                        if (idx > 0) {
+                          const key = line.slice(0, idx).trim()
+                          const val = line.slice(idx + sep.length).trim()
+                          if (key === '姓名' || key === 'name') char.name = val
+                          else if (key === '身份' || key === 'role') char.role = val
+                          else if (key === '描述' || key === 'description') char.description = val
+                        }
+                      }
+                      return char
+                    })
+                    setBook({ ...book, theme_config: { ...book.theme_config, characters: chars as unknown as Character[] } })
                   }}
-                  placeholder='[{"name":"张三","role":"主角","description":"..."}]' />
+                  placeholder={'姓名：张三\n身份：主角\n描述：一个勇敢的少年...\n---\n姓名：李四\n身份：配角\n描述：神秘的老者'} />
               </Form.Item>
             ),
           },
