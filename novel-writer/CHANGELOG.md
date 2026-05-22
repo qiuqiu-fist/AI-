@@ -1,5 +1,26 @@
 # 修复和改进日志
 
+## 每天自定义章数功能 (v1.2.0)
+
+### 新增功能
+
+#### 1. 每天自定义生成章数
+- **文件**:
+  - `backend/app/models/book.py` - 添加了`daily_chapters`字段
+  - `backend/app/schemas/book.py` - 添加了`daily_chapters`字段
+  - `backend/app/services/scheduler.py` - 修改了定时生成逻辑
+  - `frontend/src/types/index.ts` - 添加了`daily_chapters`类型定义
+  - `frontend/src/pages/BookDetail.tsx` - 添加了章数输入框
+- **功能**: 
+  - 用户可以设置每天生成1-10章
+  - 定时任务会检查今天已生成的章节数，补足到达到设置章数
+  - 如果部分失败会自动重试
+  - 支持灵活的生成进度显示
+- **改进**: 
+  - 定时任务更智能，避免重复生成
+  - 更详细的日志记录
+  - 用户可以按需调整生成频率
+
 ## 修复卡顿问题 (v1.1.0)
 
 ### 主要修复内容

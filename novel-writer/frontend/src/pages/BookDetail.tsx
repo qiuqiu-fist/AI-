@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Card, Button, Table, Tag, Space, Form, Input, Select, Switch, TimePicker,
+  Card, Button, Table, Tag, Space, Form, Input, Select, Switch, TimePicker, InputNumber,
   Tabs, message, Spin, Row, Col, Modal,
 } from 'antd'
 import dayjs from 'dayjs'
@@ -214,6 +214,9 @@ export default function BookDetail() {
               </Form.Item>
               <Form.Item name="schedule_time" label="定时时间">
                 <TimePicker format="HH:mm" />
+              </Form.Item>
+              <Form.Item name="daily_chapters" label="每天生成章数">
+                <InputNumber min={1} max={10} defaultValue={1} style={{ width: '100%' }} />
               </Form.Item>
             </Form>
           </Card>

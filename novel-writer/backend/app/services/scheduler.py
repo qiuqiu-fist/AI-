@@ -18,18 +18,40 @@ MAX_RETRIES = 2
 async def scheduled_generation(book_id: int, retry_count: int = 0):
     db = SessionLocal()
     try:
-        today = datetime.date.today()
-        existing = db.query(Chapter).filter(
-            Chapter.book_id == book_id,
-            Chapter.generated_date == today,
-        ).first()
-        if existing:
-            logger.info(f"书籍 {book_id} 今天已生成，跳过")
+        # 获取书籍信息
+        book = db.query(Book).filter(Book.id == book_id).first()
+        if not book:
+            logger.warning(f"书籍 {book_id} 不存在")
             return
         
-        logger.info(f"开始为书籍 {book_id} 生成章节（重试次数：{retry_count}）")
-        await generate_chapter(book_id, db)
-        logger.info(f"书籍 {book_id} 定时生成完成")
+        today = datetime.date.today()
+        
+        # 查询今天已生成的章节数
+        existing_count = db.query(Chapter).filter(
+            Chapter.book_id == book_id,
+            Chapter.generated_date == today,
+        ).count()
+        
+        # 计算还需要生成的章节数
+        daily_chapters = max(1, book.daily_chapters)
+        chapters_to_generate = daily_chapters - existing_count
+        
+        if chapters_to_generate <= 0:
+            logger.info(f"书籍 {book_id} 今天已生成 {existing_count}/{daily_chapters} 章，跳过")
+            return
+        
+        logger.info(f"开始为书籍 {book_id} 生成 {chapters_to_generate} 章（重试次数：{retry_count}）")
+        
+        # 生成需要的章节
+        for i in range(chapters_to_generate):
+            try:
+                await generate_chapter(book_id, db)
+                logger.info(f"书籍 {book_id} 第 {i + 1}/{chapters_to_generate} 章生成完成")
+            except Exception as e:
+                logger.error(f"书籍 {book_id} 第 {i + 1}/{chapters_to_generate} 章生成失败: {e}")
+                raise
+        
+        logger.info(f"书籍 {book_id} 定时生成完成，共生成 {chapters_to_generate} 章")
     except Exception as e:
         logger.error(f"书籍 {book_id} 定时生成失败: {e}")
         if retry_count < MAX_RETRIES:

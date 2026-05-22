@@ -12,6 +12,7 @@ class BookBase(BaseModel):
     output_format: str = "md"
     schedule_enabled: bool = False
     schedule_time: str = "09:00"
+    daily_chapters: int = 1
     theme_config: dict = {}
 
 

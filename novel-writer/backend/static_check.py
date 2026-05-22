@@ -108,6 +108,8 @@ def main():
         (r"retry_count:\s*int\s*=\s*0", "重试计数参数"),
         (r"await asyncio\.sleep\(30\)", "重试延迟30秒"),
         (r"GenerationLog", "错误日志记录"),
+        (r"daily_chapters", "daily_chapters字段"),
+        (r"chapters_to_generate", "多章生成逻辑"),
     ]
     
     for pattern, desc in checks:
@@ -178,6 +180,56 @@ def main():
         else:
             print(f"  ✗ Chapters API {desc}")
             results.append(False)
+    
+    print("\n8. 检查daily_chapters功能...")
+    
+    # 检查Book模型
+    book_model_path = base_path / "backend" / "app" / "models" / "book.py"
+    with open(book_model_path, 'r', encoding='utf-8') as f:
+        book_model_content = f.read()
+    
+    if re.search(r"daily_chapters.*Column", book_model_content):
+        print("  ✓ Book模型添加了daily_chapters字段")
+        results.append(True)
+    else:
+        print("  ✗ Book模型缺少daily_chapters字段")
+        results.append(False)
+    
+    # 检查Book schema
+    book_schema_path = base_path / "backend" / "app" / "schemas" / "book.py"
+    with open(book_schema_path, 'r', encoding='utf-8') as f:
+        book_schema_content = f.read()
+    
+    if re.search(r"daily_chapters:\s*int", book_schema_content):
+        print("  ✓ Book schema添加了daily_chapters字段")
+        results.append(True)
+    else:
+        print("  ✗ Book schema缺少daily_chapters字段")
+        results.append(False)
+    
+    # 检查前端类型定义
+    frontend_types_path = base_path / "frontend" / "src" / "types" / "index.ts"
+    with open(frontend_types_path, 'r', encoding='utf-8') as f:
+        frontend_types_content = f.read()
+    
+    if re.search(r"daily_chapters:\s*number", frontend_types_content):
+        print("  ✓ 前端类型定义添加了daily_chapters字段")
+        results.append(True)
+    else:
+        print("  ✗ 前端类型定义缺少daily_chapters字段")
+        results.append(False)
+    
+    # 检查前端界面
+    bookdetail_path = base_path / "frontend" / "src" / "pages" / "BookDetail.tsx"
+    with open(bookdetail_path, 'r', encoding='utf-8') as f:
+        bookdetail_content = f.read()
+    
+    if "daily_chapters" in bookdetail_content:
+        print("  ✓ 前端界面添加了daily_chapters输入框")
+        results.append(True)
+    else:
+        print("  ✗ 前端界面缺少daily_chapters输入框")
+        results.append(False)
     
     print("\n" + "=" * 60)
     passed = sum(results)
