@@ -1,5 +1,29 @@
 # 修复和改进日志
 
+## SSE 实时推送 + 生成历史统计 (v3.0.0)
+
+### 新增功能
+
+#### 1. SSE 实时推送
+- **文件**: `backend/app/services/event_bus.py`, `backend/app/routers/chapters.py`, `backend/app/services/generator.py`, `frontend/src/pages/ChapterListPage.tsx`
+- **功能**:
+  - 使用 SSE (Server-Sent Events) 替代前端 1.5s 轮询，实现真正的实时推送
+  - EventBus 内存单例管理各书籍的订阅队列
+  - 生成进度变化立即推送至前端，无延迟
+  - 前端使用浏览器原生 EventSource API，零额外依赖
+  - SSE 断开时自动退化到轮询模式
+
+#### 2. 生成历史记录与统计
+- **文件**: `backend/app/routers/chapters.py`, `frontend/src/pages/ChapterListPage.tsx`
+- **功能**:
+  - 章节管理页新增「生成历史」Tab 页
+  - 展示每次生成的详细记录（开始时间、耗时、AI 模型、状态、错误信息）
+  - 顶部统计卡片：总生成次数、成功数、成功率、平均耗时
+  - 支持分页浏览历史记录
+
+### 设计文档
+- `docs/superpowers/specs/2026-05-23-realtime-history-design.md`
+
 ## 并发批量生成 + 实时进度追踪 (v2.0.0)
 
 ### 主要改进内容
@@ -145,8 +169,8 @@
 
 ### 后续改进计划
 
-1. [ ] 添加WebSocket支持，实现真正的实时推送
-2. [ ] 添加生成进度百分比显示
-3. [ ] 添加生成历史记录和统计
-4. [ ] 支持批量生成多个章节
-5. [ ] 添加生成内容的预览和编辑功能
+- [x] 添加WebSocket支持，实现真正的实时推送 （v3.0.0 已实现 SSE 实时推送）
+- [x] 添加生成进度百分比显示 （v2.0.0 已实现）
+- [x] 添加生成历史记录和统计 （v3.0.0 已实现）
+- [x] 支持批量生成多个章节 （v2.0.0 已实现）
+- [x] 添加生成内容的预览和编辑功能 （v1.0.0 已实现）

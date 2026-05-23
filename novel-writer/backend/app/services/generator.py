@@ -9,13 +9,20 @@ from app.models.generation_log import GenerationLog
 from app.services.ai_providers import AIController
 from app.services.prompt_builder import build_generation_prompt
 from app.services.exporter import export_chapter
+from app.services.event_bus import EventBus
 
 
-def _set_progress(db: Session, log_id: int, progress: int):
+_event_bus = EventBus()
+
+def _set_progress(db: Session, log_id: int, book_id: int, progress: int):
     db.query(GenerationLog).filter(GenerationLog.id == log_id).update(
         {"progress": progress}
     )
     db.commit()
+    _event_bus.publish(book_id, "progress", {
+        "progress": progress,
+        "status": "running",
+    })
 
 
 async def generate_chapter(book_id: int, db: Session) -> Chapter:
@@ -64,7 +71,7 @@ async def generate_chapter(book_id: int, db: Session) -> Chapter:
     db.commit()
     log_id = log.id
 
-    _set_progress(db, log_id, 15)
+    _set_progress(db, log_id, book_id, 15)
 
     try:
         controller = AIController()
@@ -78,9 +85,9 @@ async def generate_chapter(book_id: int, db: Session) -> Chapter:
             "template_content": "",
         }
 
-        _set_progress(db, log_id, 30)
+        _set_progress(db, log_id, book_id, 30)
         content = await controller.generate(ai_config.provider_name, prompt, provider_config)
-        _set_progress(db, log_id, 80)
+        _set_progress(db, log_id, book_id, 80)
 
         chapter_number = len(existing_chapters) + 1
         chapter = Chapter(
@@ -98,7 +105,7 @@ async def generate_chapter(book_id: int, db: Session) -> Chapter:
         db.add(chapter)
         db.commit()
 
-        _set_progress(db, log_id, 90)
+        _set_progress(db, log_id, book_id, 90)
 
         file_path = export_chapter(book, chapter, db)
         chapter.file_path = file_path

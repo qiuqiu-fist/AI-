@@ -1,6 +1,8 @@
 import asyncio
 import datetime
+import json
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db, SessionLocal
@@ -10,6 +12,7 @@ from app.models.generation_log import GenerationLog
 from app.schemas.chapter import ChapterCreate, ChapterUpdate, ChapterResponse
 from app.services.generator import generate_chapter, regenerate_chapter
 from app.services.exporter import export_chapter, export_all_chapters
+from app.services.event_bus import EventBus
 
 router = APIRouter(prefix="/api", tags=["chapters"])
 
@@ -65,8 +68,10 @@ def delete_chapter(chapter_id: int, db: Session = Depends(get_db)):
 
 async def _run_generation(book_id: int):
     db = SessionLocal()
+    event_bus = EventBus()
     try:
         await generate_chapter(book_id, db)
+        await event_bus.publish(book_id, "done", {"status": "success", "message": "生成成功"})
     except Exception:
         try:
             log = db.query(GenerationLog).filter(
@@ -80,6 +85,7 @@ async def _run_generation(book_id: int):
                 db.commit()
         except Exception:
             pass
+        await event_bus.publish(book_id, "done", {"status": "failed", "message": "后台生成失败"})
     finally:
         db.close()
 
@@ -169,6 +175,72 @@ def get_generation_status(book_id: int, db: Session = Depends(get_db)):
         }
     
     return {"status": "unknown", "message": "未知状态"}
+
+@router.get("/books/{book_id}/generation-events")
+async def generation_events(book_id: int):
+    event_bus = EventBus()
+
+    async def event_stream():
+        queue = event_bus.subscribe(book_id)
+        try:
+            while True:
+                event, data = await queue.get()
+                yield f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+                if event == "done":
+                    break
+        finally:
+            event_bus.unsubscribe(book_id)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+@router.get("/books/{book_id}/generation-history")
+def get_generation_history(book_id: int, limit: int = 50, db: Session = Depends(get_db)):
+    logs = db.query(GenerationLog).filter(
+        GenerationLog.book_id == book_id
+    ).order_by(GenerationLog.started_at.desc()).limit(limit).all()
+
+    items = []
+    for log in logs:
+        duration = None
+        if log.started_at and log.completed_at:
+            duration = int((log.completed_at - log.started_at).total_seconds())
+        items.append({
+            "id": log.id,
+            "status": log.status,
+            "progress": log.progress or 0,
+            "ai_provider": log.ai_provider,
+            "model_name": log.model_name,
+            "chapter_id": log.chapter_id,
+            "error_message": log.error_message,
+            "started_at": log.started_at.isoformat() if log.started_at else None,
+            "completed_at": log.completed_at.isoformat() if log.completed_at else None,
+            "duration_seconds": duration,
+        })
+
+    total = len(logs)
+    success_count = sum(1 for l in logs if l.status == "success")
+    failed_count = sum(1 for l in logs if l.status == "failed")
+    durations = [i["duration_seconds"] for i in items if i["duration_seconds"]]
+
+    stats = {
+        "total": total,
+        "success": success_count,
+        "failed": failed_count,
+        "success_rate": round((success_count / total * 100) if total > 0 else 0, 1),
+        "avg_duration_seconds": round(sum(durations) / len(durations), 1) if durations else 0,
+    }
+
+    return {"items": items, "stats": stats}
+
 
 # Keep the sync version for backward compatibility
 @router.post("/books/{book_id}/generate-sync")
