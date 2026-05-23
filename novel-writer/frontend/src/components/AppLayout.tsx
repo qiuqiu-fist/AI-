@@ -91,7 +91,7 @@ export default function AppLayout() {
         collapsed={collapsed}
         onCollapse={setCollapsed}
         theme="light"
-        width={260}
+        width={240}
         style={{
           background: 'linear-gradient(180deg, #0f0d2e 0%, #1a1744 100%)',
           borderRight: 'none',
@@ -100,30 +100,30 @@ export default function AppLayout() {
       >
         {!collapsed && (
           <div style={{
-            padding: '20px 16px',
+            padding: '14px 16px 12px',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', alignItems: 'center', gap: 12,
+            display: 'flex', alignItems: 'center', gap: 10,
           }}>
             <div style={{
-              width: 40, height: 40, borderRadius: 10,
+              width: 36, height: 36, borderRadius: 9,
               background: 'linear-gradient(135deg, #6366f1, #06b6d4)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'white', fontWeight: 700, fontSize: 16, position: 'relative',
+              color: 'white', fontWeight: 700, fontSize: 15, position: 'relative',
             }}>
               <span>作</span>
               <div style={{
-                width: 10, height: 10, background: '#10b981',
+                width: 8, height: 8, background: '#10b981',
                 border: '2px solid #1a1744', borderRadius: '50%',
-                position: 'absolute', bottom: -2, right: -2,
+                position: 'absolute', bottom: -1, right: -1,
               }} />
             </div>
             <div style={{ flex: 1 }}>
-              <div style={{ color: 'white', fontWeight: 600, fontSize: 14 }}>创作者</div>
-              <div style={{ color: '#9b97c4', fontSize: 12 }}>今日已写 0 字</div>
+              <div style={{ color: 'white', fontWeight: 600, fontSize: 13 }}>创作者</div>
+              <div style={{ color: '#9b97c4', fontSize: 11 }}>今日已写 0 字</div>
             </div>
           </div>
         )}
-        <div style={{ padding: '8px 0' }}>
+        <div style={{ padding: '6px 0' }}>
           {menuItems.map(item => {
             const isSelected = rootKey === item.key
             return (
@@ -133,15 +133,15 @@ export default function AppLayout() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10,
-                    padding: collapsed ? '12px 0' : '12px 24px',
+                    gap: 8,
+                    padding: collapsed ? '10px 0' : '9px 20px',
                     cursor: 'pointer',
                     color: isSelected ? '#c7d2fe' : '#9b97c4',
                     background: isSelected
                       ? 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.05))'
                       : 'transparent',
                     justifyContent: collapsed ? 'center' : 'flex-start',
-                    fontSize: 14,
+                    fontSize: 13,
                     position: 'relative',
                     transition: 'all 0.2s',
                   }}
@@ -162,16 +162,16 @@ export default function AppLayout() {
                     <div style={{
                       position: 'absolute', left: 0, top: '50%',
                       transform: 'translateY(-50%)',
-                      width: 3, height: 20,
+                      width: 3, height: 16,
                       background: '#6366f1',
                       borderRadius: '0 3px 3px 0',
                     }} />
                   )}
-                  <span style={{ fontSize: 16 }}>{item.icon}</span>
+                  <span style={{ fontSize: 15 }}>{item.icon}</span>
                   {!collapsed && <span>{item.label}</span>}
                   {isSelected && !collapsed && inSubPage && (
                     <span style={{
-                      marginLeft: 'auto', fontSize: 11,
+                      marginLeft: 'auto', fontSize: 10,
                       color: '#a5b4fc', opacity: 0.7,
                     }}>
                       · 子页面
@@ -181,8 +181,8 @@ export default function AppLayout() {
 
                 {isSelected && !collapsed && inSubPage && (
                   <div style={{
-                    padding: '4px 0 6px 52px',
-                    display: 'flex', flexDirection: 'column', gap: 2,
+                    padding: '2px 0 4px 44px',
+                    display: 'flex', flexDirection: 'column', gap: 1,
                   }}>
                     {subNavItems.map(sub => {
                       const isSubActive = (
@@ -203,9 +203,9 @@ export default function AppLayout() {
                             if (sub.path) navigate(sub.path)
                           }}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: 8,
-                            padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
-                            fontSize: 13,
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '5px 10px', borderRadius: 5, cursor: 'pointer',
+                            fontSize: 12,
                             color: isSubActive ? '#c7d2fe' : '#9b97c4',
                             background: isSubActive ? 'rgba(99,102,241,0.15)' : 'transparent',
                             transition: 'all 0.15s',
@@ -221,7 +221,7 @@ export default function AppLayout() {
                             }
                           }}
                         >
-                          <span style={{ fontSize: 13 }}>{sub.icon}</span>
+                          <span style={{ fontSize: 12 }}>{sub.icon}</span>
                           <span>{sub.label}</span>
                         </div>
                       )
@@ -235,8 +235,8 @@ export default function AppLayout() {
         {!collapsed && (
           <div style={{
             position: 'absolute', bottom: 0, left: 0, right: 0,
-            padding: 12, borderTop: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex', gap: 8,
+            padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', gap: 6,
           }}>
             {[
               { value: stats.books, label: '项目' },
@@ -244,11 +244,11 @@ export default function AppLayout() {
               { value: stats.words, label: '字数' },
             ].map(stat => (
               <div key={stat.label} style={{
-                flex: 1, padding: 8, borderRadius: 8,
+                flex: 1, padding: '5px 4px', borderRadius: 6,
                 background: 'rgba(255,255,255,0.04)', textAlign: 'center',
               }}>
-                <div style={{ color: 'white', fontWeight: 700, fontSize: 14 }}>{stat.value}</div>
-                <div style={{ color: '#9b97c4', fontSize: 10 }}>{stat.label}</div>
+                <div style={{ color: 'white', fontWeight: 700, fontSize: 13 }}>{stat.value}</div>
+                <div style={{ color: '#9b97c4', fontSize: 9 }}>{stat.label}</div>
               </div>
             ))}
           </div>
