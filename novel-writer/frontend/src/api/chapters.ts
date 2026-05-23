@@ -8,6 +8,7 @@ export interface GenerationStatus {
   error_message?: string
   started_at?: string
   completed_at?: string
+  progress?: number
 }
 
 export const chapterApi = {
@@ -17,6 +18,7 @@ export const chapterApi = {
   update: (id: number, data: Partial<Chapter>) => client.put<Chapter>(`/chapters/${id}`, data),
   delete: (id: number) => client.delete(`/chapters/${id}`),
   generate: (bookId: number) => client.post(`/books/${bookId}/generate`),
+  generateBatch: (bookId: number, count: number) => client.post(`/books/${bookId}/generate-batch?count=${count}`),
   getGenerationStatus: (bookId: number) => client.get<GenerationStatus>(`/books/${bookId}/generation-status`),
   regenerate: (chapterId: number) => client.post(`/chapters/${chapterId}/regenerate`),
   export: (bookId: number, chapterId: number) => client.post(`/books/${bookId}/export/${chapterId}`),

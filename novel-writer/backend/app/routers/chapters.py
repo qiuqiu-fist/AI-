@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+import asyncio
+import datetime
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime, timedelta
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models.book import Book
 from app.models.chapter import Chapter
 from app.models.generation_log import GenerationLog
@@ -62,16 +63,45 @@ def delete_chapter(chapter_id: int, db: Session = Depends(get_db)):
     return {"message": "删除成功"}
 
 
+async def _run_generation(book_id: int):
+    db = SessionLocal()
+    try:
+        await generate_chapter(book_id, db)
+    except Exception:
+        try:
+            log = db.query(GenerationLog).filter(
+                GenerationLog.book_id == book_id,
+                GenerationLog.status == "running"
+            ).order_by(GenerationLog.started_at.desc()).first()
+            if log:
+                log.status = "failed"
+                log.error_message = "后台生成失败"
+                log.completed_at = datetime.datetime.utcnow()
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
 @router.post("/books/{book_id}/generate")
 async def trigger_generate(book_id: int, db: Session = Depends(get_db)):
     book = db.query(Book).filter(Book.id == book_id).first()
     if not book:
         raise HTTPException(404, "书籍不存在")
-    try:
-        chapter = await generate_chapter(book_id, db)
-        return {"message": "生成成功", "chapter_id": chapter.id}
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+    asyncio.create_task(_run_generation(book_id))
+    return {"message": "生成任务已启动"}
+
+
+@router.post("/books/{book_id}/generate-batch")
+async def trigger_generate_batch(book_id: int, count: int = 3, db: Session = Depends(get_db)):
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book:
+        raise HTTPException(404, "书籍不存在")
+    count = max(1, min(count, 10))
+    for _ in range(count):
+        asyncio.create_task(_run_generation(book_id))
+    return {"message": f"批量生成任务已启动，共 {count} 章", "count": count}
 
 
 @router.post("/chapters/{chapter_id}/regenerate")
@@ -112,27 +142,42 @@ def get_generation_status(book_id: int, db: Session = Depends(get_db)):
         return {"status": "idle", "message": "暂无生成任务"}
     
     if recent_log.status == "running":
-        time_running = datetime.utcnow() - recent_log.started_at
+        time_running = datetime.datetime.utcnow() - recent_log.started_at
         return {
             "status": "running",
             "message": f"正在生成中（已运行 {int(time_running.total_seconds())} 秒）",
-            "started_at": recent_log.started_at.isoformat()
+            "started_at": recent_log.started_at.isoformat(),
+            "progress": recent_log.progress or 0
         }
-    
+
     if recent_log.status == "success":
         return {
             "status": "success",
             "message": "生成成功",
             "chapter_id": recent_log.chapter_id,
-            "completed_at": recent_log.completed_at.isoformat() if recent_log.completed_at else None
+            "completed_at": recent_log.completed_at.isoformat() if recent_log.completed_at else None,
+            "progress": 100
         }
-    
+
     if recent_log.status == "failed":
         return {
             "status": "failed",
             "message": f"生成失败: {recent_log.error_message}",
             "error_message": recent_log.error_message,
-            "completed_at": recent_log.completed_at.isoformat() if recent_log.completed_at else None
+            "completed_at": recent_log.completed_at.isoformat() if recent_log.completed_at else None,
+            "progress": 0
         }
     
     return {"status": "unknown", "message": "未知状态"}
+
+# Keep the sync version for backward compatibility
+@router.post("/books/{book_id}/generate-sync")
+async def trigger_generate_sync(book_id: int, db: Session = Depends(get_db)):
+    book = db.query(Book).filter(Book.id == book_id).first()
+    if not book:
+        raise HTTPException(404, "书籍不存在")
+    try:
+        chapter = await generate_chapter(book_id, db)
+        return {"message": "生成成功", "chapter_id": chapter.id}
+    except ValueError as e:
+        raise HTTPException(400, str(e))

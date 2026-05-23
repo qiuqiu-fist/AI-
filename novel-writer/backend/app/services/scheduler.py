@@ -1,5 +1,6 @@
 import datetime
 import logging
+import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
@@ -15,10 +16,19 @@ scheduler = AsyncIOScheduler()
 MAX_RETRIES = 2
 
 
+async def _gen_single_chapter(book_id: int):
+    db = SessionLocal()
+    try:
+        await generate_chapter(book_id, db)
+    except Exception as e:
+        logger.error(f"书籍 {book_id} 章节生成失败: {e}")
+    finally:
+        db.close()
+
+
 async def scheduled_generation(book_id: int, retry_count: int = 0):
     db = SessionLocal()
     try:
-        # 获取书籍信息
         book = db.query(Book).filter(Book.id == book_id).first()
         if not book:
             logger.warning(f"书籍 {book_id} 不存在")
@@ -26,13 +36,11 @@ async def scheduled_generation(book_id: int, retry_count: int = 0):
         
         today = datetime.date.today()
         
-        # 查询今天已生成的章节数
         existing_count = db.query(Chapter).filter(
             Chapter.book_id == book_id,
             Chapter.generated_date == today,
         ).count()
         
-        # 计算还需要生成的章节数
         daily_chapters = max(1, book.daily_chapters)
         chapters_to_generate = daily_chapters - existing_count
         
@@ -40,23 +48,16 @@ async def scheduled_generation(book_id: int, retry_count: int = 0):
             logger.info(f"书籍 {book_id} 今天已生成 {existing_count}/{daily_chapters} 章，跳过")
             return
         
-        logger.info(f"开始为书籍 {book_id} 生成 {chapters_to_generate} 章（重试次数：{retry_count}）")
+        logger.info(f"开始为书籍 {book_id} 并发生成 {chapters_to_generate} 章（重试次数：{retry_count}）")
         
-        # 生成需要的章节
-        for i in range(chapters_to_generate):
-            try:
-                await generate_chapter(book_id, db)
-                logger.info(f"书籍 {book_id} 第 {i + 1}/{chapters_to_generate} 章生成完成")
-            except Exception as e:
-                logger.error(f"书籍 {book_id} 第 {i + 1}/{chapters_to_generate} 章生成失败: {e}")
-                raise
+        tasks = [_gen_single_chapter(book_id) for _ in range(chapters_to_generate)]
+        await asyncio.gather(*tasks)
         
-        logger.info(f"书籍 {book_id} 定时生成完成，共生成 {chapters_to_generate} 章")
+        logger.info(f"书籍 {book_id} 定时生成完成，共并发生成 {chapters_to_generate} 章")
     except Exception as e:
         logger.error(f"书籍 {book_id} 定时生成失败: {e}")
         if retry_count < MAX_RETRIES:
             logger.info(f"将在30秒后重试（第 {retry_count + 1}/{MAX_RETRIES} 次）")
-            import asyncio
             await asyncio.sleep(30)
             await scheduled_generation(book_id, retry_count + 1)
         else:
@@ -65,13 +66,10 @@ async def scheduled_generation(book_id: int, retry_count: int = 0):
                 ai_provider="system",
                 model_name="system",
                 status="failed",
-                error_message=f"定时任务失败，已重试{MAX_RETRIES}次: {str(e)}",
-                started_at=datetime.datetime.utcnow(),
-                completed_at=datetime.datetime.utcnow(),
+                error_message=f"定时生成失败，已重试{MAX_RETRIES}次: {str(e)[:200]}",
             )
             db.add(log)
             db.commit()
-            logger.error(f"书籍 {book_id} 定时任务重试失败，已记录错误")
     finally:
         db.close()
 

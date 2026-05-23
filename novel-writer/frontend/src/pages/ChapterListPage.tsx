@@ -16,14 +16,7 @@ const { Text } = Typography
 
 const MAX_POLL_ATTEMPTS = 75
 const GENERATION_TIMEOUT_MS = 300_000
-
-const genPhases = [
-  { label: '启动生成任务', min: 0, max: 15 },
-  { label: 'AI 读取上下文', min: 15, max: 30 },
-  { label: 'AI 创作中', min: 30, max: 70 },
-  { label: '整理输出内容', min: 70, max: 90 },
-  { label: '完成', min: 90, max: 100 },
-]
+const POLL_INTERVAL = 1500
 
 function estimatedProgress(startedAt: string | undefined): number {
   if (!startedAt) return 5
@@ -34,10 +27,16 @@ function estimatedProgress(startedAt: string | undefined): number {
 }
 
 function genPhaseLabel(progress: number): string {
-  for (const p of genPhases) {
-    if (progress >= p.min && progress < p.max) return p.label
-  }
+  if (progress < 15) return '启动生成任务'
+  if (progress < 30) return 'AI 读取上下文'
+  if (progress < 80) return 'AI 创作中'
+  if (progress < 90) return '整理输出内容'
   return '完成中'
+}
+
+function combinedProgress(serverProgress: number | undefined, startedAt: string | undefined): number {
+  if (serverProgress && serverProgress > 0) return serverProgress
+  return estimatedProgress(startedAt)
 }
 
 export default function ChapterListPage() {
@@ -64,6 +63,8 @@ export default function ChapterListPage() {
   const [batchRunning, setBatchRunning] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
   const [batchCancel, setBatchCancel] = useState(false)
+  const [batchDoneCount, setBatchDoneCount] = useState(0)
+  const batchPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadChapters = async () => {
     try {
@@ -81,6 +82,7 @@ export default function ChapterListPage() {
     if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null }
     if (progressTimerRef.current) { clearInterval(progressTimerRef.current); progressTimerRef.current = null }
     if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
+    if (batchPollRef.current) { clearInterval(batchPollRef.current); batchPollRef.current = null }
     pollCountRef.current = 0
     genStartRef.current = 0
   }, [])
@@ -95,7 +97,7 @@ export default function ChapterListPage() {
     progressTimerRef.current = setInterval(() => {
       const elapsed = Date.now() - genStartRef.current
       setGenElapsed(elapsed)
-      setGenProgress(estimatedProgress(generationStatus?.started_at))
+      setGenProgress(combinedProgress(generationStatus?.progress, generationStatus?.started_at))
     }, 1000)
   }
 
@@ -115,7 +117,7 @@ export default function ChapterListPage() {
         const statusResp = await chapterApi.getGenerationStatus(Number(bookId))
         setGenerationStatus(statusResp.data)
         if (statusResp.data.started_at) {
-          setGenProgress(estimatedProgress(statusResp.data.started_at))
+          setGenProgress(combinedProgress(statusResp.data.progress, statusResp.data.started_at))
         }
         if (statusResp.data.status === 'success' || statusResp.data.status === 'failed') {
           cleanupGen()
@@ -136,7 +138,7 @@ export default function ChapterListPage() {
           setGenTimedOut(true)
         }
       }
-    }, 2000)
+    }, POLL_INTERVAL)
   }
 
   const handleCancelGen = () => {
@@ -157,6 +159,7 @@ export default function ChapterListPage() {
       setGenerationStatus({ status: 'running', message: '正在启动生成任务...' })
       startProgressTimer()
       await chapterApi.generate(Number(bookId))
+      await new Promise(resolve => setTimeout(resolve, 1500))
       startPolling()
     } catch (e: unknown) {
       cleanupGen()
@@ -169,29 +172,53 @@ export default function ChapterListPage() {
     try {
       setBatchRunning(true)
       setBatchCancel(false)
+      setBatchDoneCount(0)
       setBatchProgress({ current: 0, total: batchCount })
-      for (let i = 0; i < batchCount; i++) {
-        if (batchCancel) {
-          message.info('批量生成已取消')
+      setGenerating(true)
+      setGenElapsed(0)
+      setGenTimedOut(false)
+      setGenerationStatus({ status: 'running', message: `启动批量生成 ${batchCount} 章...` })
+      startProgressTimer()
+
+      await chapterApi.generateBatch(Number(bookId), batchCount)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      let seenDone = new Set<number>()
+      const maxWaitLoop = 200
+      for (let i = 0; i < maxWaitLoop; i++) {
+        if (batchCancel) break
+        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL))
+        const resp = await chapterApi.getGenerationStatus(Number(bookId))
+        setGenerationStatus(resp.data)
+        if (resp.data.status === 'success' && resp.data.chapter_id) {
+          seenDone.add(resp.data.chapter_id)
+        }
+        setBatchDoneCount(seenDone.size)
+        const pct = Math.min(Math.round((seenDone.size / batchCount) * 100), 99)
+        setGenProgress(pct)
+        setBatchProgress({ current: Math.min(seenDone.size + 1, batchCount), total: batchCount })
+        if (resp.data.status !== 'running') {
           break
         }
-        setBatchProgress({ current: i + 1, total: batchCount })
-        setGenerationStatus({ status: 'running', message: `第 ${i + 1}/${batchCount} 章` })
-        setGenProgress(Math.round(((i) / batchCount) * 100))
-        await chapterApi.generate(Number(bookId))
-        setGenProgress(Math.round(((i + 1) / batchCount) * 100))
-        await new Promise(resolve => setTimeout(resolve, 1200))
       }
-      setBatchRunning(false)
-      setBatchModalOpen(false)
-      if (!batchCancel) {
-        message.success(`批量生成完成，共触发 ${batchProgress.current} 章`)
-      }
-      loadChapters()
+      finishBatch()
     } catch (e: unknown) {
-      setBatchRunning(false)
+      finishBatch()
       message.error((e as Error).message)
     }
+  }
+
+  const finishBatch = () => {
+    if (batchPollRef.current) { clearInterval(batchPollRef.current); batchPollRef.current = null }
+    cleanupGen()
+    setBatchRunning(false)
+    setGenerating(false)
+    setBatchModalOpen(false)
+    setGenProgress(100)
+    if (!batchCancel) {
+      message.success(`批量生成完成，共 ${batchCount} 章`)
+    }
+    loadChapters()
   }
 
   const handleExportAll = async () => {
