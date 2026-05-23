@@ -10,6 +10,7 @@ import {
   UnorderedListOutlined,
   ReadOutlined,
   EditOutlined,
+  OrderedListOutlined,
 } from '@ant-design/icons'
 import { bookApi } from '../api/books'
 import { systemApi } from '../api/system'
@@ -33,9 +34,12 @@ const pageTitles: Record<string, { label: string; icon: React.ReactNode; desc: s
 }
 
 const subNavItems = [
-  { key: 'list', icon: <UnorderedListOutlined />, label: '项目列表', path: '/books', matchLen: 1 },
-  { key: 'detail', icon: <ReadOutlined />, label: '项目详情', matchLen: 2 },
-  { key: 'editor', icon: <EditOutlined />, label: '章节编辑', matchLen: 3 },
+  { key: 'list', icon: <UnorderedListOutlined />, label: '项目列表', getPath: () => '/books', isActive: (s: string[]) => s.length === 1, showLevel: 0 },
+  { key: 'detail', icon: <ReadOutlined />, label: '项目总览', getPath: (id: string) => `/books/${id}`, isActive: (s: string[]) => s.length === 2, showLevel: 1 },
+  { key: 'chapters', icon: <OrderedListOutlined />, label: '章节管理', getPath: (id: string) => `/books/${id}/chapters`, isActive: (s: string[]) => s.length >= 3 && s[2] === 'chapters', showLevel: 2 },
+  { key: 'settings', icon: <SettingOutlined />, label: '项目设置', getPath: (id: string) => `/books/${id}/settings`, isActive: (s: string[]) => s.length >= 3 && s[2] === 'settings', showLevel: 2 },
+  { key: 'themes', icon: <BookOutlined />, label: '创作设定', getPath: (id: string) => `/books/${id}/themes`, isActive: (s: string[]) => s.length >= 3 && s[2] === 'themes', showLevel: 2 },
+  { key: 'editor', icon: <EditOutlined />, label: '章节编辑', getPath: (id: string) => `/books/${id}/chapters/${id}`, isActive: (s: string[]) => s.length >= 4, showLevel: 3 },
 ]
 
 export default function AppLayout() {
@@ -185,22 +189,16 @@ export default function AppLayout() {
                     display: 'flex', flexDirection: 'column', gap: 1,
                   }}>
                     {subNavItems.map(sub => {
-                      const isSubActive = (
-                        (sub.matchLen === 1 && segments.length === 1) ||
-                        (sub.matchLen === 2 && segments.length === 2) ||
-                        (sub.matchLen === 3 && segments.length >= 3)
-                      )
-                      const showItem = (
-                        sub.matchLen === 1 ||
-                        (sub.matchLen === 2 && segments.length >= 2) ||
-                        (sub.matchLen === 3 && segments.length >= 3)
-                      )
+                      const showItem = segments.length > sub.showLevel
                       if (!showItem) return null
+                      const isSubActive = sub.isActive(segments)
+                      const bookSegment = segments[1]
                       return (
                         <div
                           key={sub.key}
                           onClick={() => {
-                            if (sub.path) navigate(sub.path)
+                            const p = sub.getPath(bookSegment)
+                            navigate(p)
                           }}
                           style={{
                             display: 'flex', alignItems: 'center', gap: 6,
@@ -211,14 +209,10 @@ export default function AppLayout() {
                             transition: 'all 0.15s',
                           }}
                           onMouseEnter={e => {
-                            if (!isSubActive) {
-                              e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
-                            }
+                            if (!isSubActive) e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
                           }}
                           onMouseLeave={e => {
-                            if (!isSubActive) {
-                              e.currentTarget.style.background = 'transparent'
-                            }
+                            if (!isSubActive) e.currentTarget.style.background = 'transparent'
                           }}
                         >
                           <span style={{ fontSize: 12 }}>{sub.icon}</span>

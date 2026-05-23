@@ -5,6 +5,9 @@ import Dashboard from './pages/Dashboard'
 import BookList from './pages/BookList'
 import BookDetail from './pages/BookDetail'
 import ChapterEditor from './pages/ChapterEditor'
+import BookSettings from './pages/BookSettings'
+import ChapterListPage from './pages/ChapterListPage'
+import ThemeConfigPage from './pages/ThemeConfigPage'
 import ProviderManage from './pages/ProviderManage'
 import History from './pages/History'
 import Settings from './pages/Settings'
@@ -28,6 +31,9 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="books" element={<BookList />} />
           <Route path="books/:bookId" element={<BookDetail />} />
+          <Route path="books/:bookId/settings" element={<BookSettings />} />
+          <Route path="books/:bookId/chapters" element={<ChapterListPage />} />
+          <Route path="books/:bookId/themes" element={<ThemeConfigPage />} />
           <Route path="books/:bookId/chapters/:chapterId" element={<ChapterEditor />} />
           <Route path="providers" element={<ProviderManage />} />
           <Route path="history" element={<History />} />
