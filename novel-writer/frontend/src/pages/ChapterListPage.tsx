@@ -1,14 +1,44 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Card, Button, Tag, Space, message, Spin, Modal, InputNumber, Tooltip, Form, Input,
+  Progress, Typography,
 } from 'antd'
 import {
   LeftOutlined, PlusOutlined, ExportOutlined, OrderedListOutlined,
   ThunderboltOutlined, BookOutlined, SettingOutlined,
+  CloseCircleOutlined, CheckCircleOutlined, LoadingOutlined,
 } from '@ant-design/icons'
 import { chapterApi, GenerationStatus } from '../api/chapters'
 import { Chapter } from '../types'
+
+const { Text } = Typography
+
+const MAX_POLL_ATTEMPTS = 75
+const GENERATION_TIMEOUT_MS = 300_000
+
+const genPhases = [
+  { label: '启动生成任务', min: 0, max: 15 },
+  { label: 'AI 读取上下文', min: 15, max: 30 },
+  { label: 'AI 创作中', min: 30, max: 70 },
+  { label: '整理输出内容', min: 70, max: 90 },
+  { label: '完成', min: 90, max: 100 },
+]
+
+function estimatedProgress(startedAt: string | undefined): number {
+  if (!startedAt) return 5
+  const elapsed = Date.now() - new Date(startedAt).getTime()
+  if (elapsed <= 0) return 5
+  const ratio = Math.min(elapsed / GENERATION_TIMEOUT_MS, 0.95)
+  return Math.round(ratio * 100)
+}
+
+function genPhaseLabel(progress: number): string {
+  for (const p of genPhases) {
+    if (progress >= p.min && progress < p.max) return p.label
+  }
+  return '完成中'
+}
 
 export default function ChapterListPage() {
   const { bookId } = useParams()
@@ -17,7 +47,15 @@ export default function ChapterListPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null)
+  const [genProgress, setGenProgress] = useState(0)
+  const [genElapsed, setGenElapsed] = useState(0)
+  const [genTimedOut, setGenTimedOut] = useState(false)
+
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollCountRef = useRef(0)
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const genStartRef = useRef(0)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [batchModalOpen, setBatchModalOpen] = useState(false)
   const [batchCount, setBatchCount] = useState(3)
@@ -25,13 +63,13 @@ export default function ChapterListPage() {
   const [batchTitles, setBatchTitles] = useState('')
   const [batchRunning, setBatchRunning] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
+  const [batchCancel, setBatchCancel] = useState(false)
 
   const loadChapters = async () => {
     try {
       const resp = await chapterApi.list(Number(bookId))
       setChapters(resp.data)
     } catch (e: unknown) {
-      message.error((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -39,37 +77,90 @@ export default function ChapterListPage() {
 
   useEffect(() => { loadChapters() }, [bookId])
 
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-    }
+  const cleanupGen = useCallback(() => {
+    if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null }
+    if (progressTimerRef.current) { clearInterval(progressTimerRef.current); progressTimerRef.current = null }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null }
+    pollCountRef.current = 0
+    genStartRef.current = 0
   }, [])
+
+  useEffect(() => {
+    return () => cleanupGen()
+  }, [cleanupGen])
+
+  const startProgressTimer = () => {
+    genStartRef.current = Date.now()
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current)
+    progressTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - genStartRef.current
+      setGenElapsed(elapsed)
+      setGenProgress(estimatedProgress(generationStatus?.started_at))
+    }, 1000)
+  }
 
   const startPolling = () => {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+    pollCountRef.current = 0
     pollIntervalRef.current = setInterval(async () => {
+      pollCountRef.current++
+      if (pollCountRef.current > MAX_POLL_ATTEMPTS) {
+        cleanupGen()
+        setGenerating(false)
+        setGenTimedOut(true)
+        message.warning('生成状态查询超时，请刷新页面查看结果')
+        return
+      }
       try {
         const statusResp = await chapterApi.getGenerationStatus(Number(bookId))
         setGenerationStatus(statusResp.data)
-        if (statusResp.data.status === 'success' || statusResp.data.status === 'failed') {
-          if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null }
-          setGenerating(false)
-          if (statusResp.data.status === 'success') { message.success('章节生成成功'); loadChapters() }
-          else message.error(statusResp.data.message)
+        if (statusResp.data.started_at) {
+          setGenProgress(estimatedProgress(statusResp.data.started_at))
         }
-      } catch (e) { console.error('轮询失败:', e) }
+        if (statusResp.data.status === 'success' || statusResp.data.status === 'failed') {
+          cleanupGen()
+          setGenerating(false)
+          setGenProgress(100)
+          if (statusResp.data.status === 'success') {
+            message.success('章节生成成功')
+            loadChapters()
+          } else {
+            message.error(statusResp.data.message || '生成失败')
+          }
+        }
+      } catch (e) {
+        pollCountRef.current += 10
+        if (pollCountRef.current > MAX_POLL_ATTEMPTS) {
+          cleanupGen()
+          setGenerating(false)
+          setGenTimedOut(true)
+        }
+      }
     }, 2000)
+  }
+
+  const handleCancelGen = () => {
+    cleanupGen()
+    setGenerating(false)
+    setBatchRunning(false)
+    setBatchModalOpen(false)
+    setGenTimedOut(false)
+    message.info('已取消生成')
   }
 
   const handleGenerate = async () => {
     try {
       setGenerating(true)
+      setGenProgress(0)
+      setGenElapsed(0)
+      setGenTimedOut(false)
       setGenerationStatus({ status: 'running', message: '正在启动生成任务...' })
+      startProgressTimer()
       await chapterApi.generate(Number(bookId))
       startPolling()
     } catch (e: unknown) {
+      cleanupGen()
       setGenerating(false)
-      if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null }
       message.error((e as Error).message)
     }
   }
@@ -77,16 +168,25 @@ export default function ChapterListPage() {
   const handleBatchGenerate = async () => {
     try {
       setBatchRunning(true)
+      setBatchCancel(false)
       setBatchProgress({ current: 0, total: batchCount })
       for (let i = 0; i < batchCount; i++) {
+        if (batchCancel) {
+          message.info('批量生成已取消')
+          break
+        }
         setBatchProgress({ current: i + 1, total: batchCount })
         setGenerationStatus({ status: 'running', message: `第 ${i + 1}/${batchCount} 章` })
+        setGenProgress(Math.round(((i) / batchCount) * 100))
         await chapterApi.generate(Number(bookId))
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        setGenProgress(Math.round(((i + 1) / batchCount) * 100))
+        await new Promise(resolve => setTimeout(resolve, 1200))
       }
       setBatchRunning(false)
       setBatchModalOpen(false)
-      message.success(`成功触发 ${batchCount} 章生成`)
+      if (!batchCancel) {
+        message.success(`批量生成完成，共触发 ${batchProgress.current} 章`)
+      }
       loadChapters()
     } catch (e: unknown) {
       setBatchRunning(false)
@@ -108,6 +208,13 @@ export default function ChapterListPage() {
     } catch (e: unknown) { message.error((e as Error).message) }
   }
 
+  const formatElapsed = (ms: number) => {
+    const s = Math.floor(ms / 1000)
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return m > 0 ? `${m}m${sec}s` : `${sec}s`
+  }
+
   if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 120 }} />
 
   return (
@@ -126,20 +233,76 @@ export default function ChapterListPage() {
           </div>
         </div>
         <Space>
-          <Button icon={<SettingOutlined />} onClick={() => navigate(`/books/${bookId}/settings`)}>
-            项目设置
-          </Button>
-          <Button icon={<BookOutlined />} onClick={() => navigate(`/books/${bookId}/themes`)}>
-            创作设定
-          </Button>
+          <Button icon={<SettingOutlined />} onClick={() => navigate(`/books/${bookId}/settings`)}>项目设置</Button>
+          <Button icon={<BookOutlined />} onClick={() => navigate(`/books/${bookId}/themes`)}>创作设定</Button>
         </Space>
       </div>
 
       <Card style={{ borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        {/* Generation Progress Bar */}
+        {(generating || genTimedOut) && (
+          <div style={{
+            marginBottom: 16, padding: '16px 20px',
+            borderRadius: 10,
+            background: genTimedOut
+              ? 'linear-gradient(135deg, #fef2f2, #fff)'
+              : 'linear-gradient(135deg, #eef2ff, #f0fdfa)',
+            border: `1px solid ${genTimedOut ? '#fecaca' : '#c7d2fe'}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {genTimedOut ? (
+                  <CloseCircleOutlined style={{ fontSize: 16, color: '#ef4444' }} />
+                ) : genProgress >= 100 ? (
+                  <CheckCircleOutlined style={{ fontSize: 16, color: '#10b981' }} />
+                ) : (
+                  <LoadingOutlined style={{ fontSize: 16, color: '#6366f1' }} />
+                )}
+                <div>
+                  <Text strong style={{ fontSize: 14, color: genTimedOut ? '#dc2626' : '#4f46e5' }}>
+                    {genTimedOut ? '生成状态查询超时' : genProgress >= 100 ? '生成完成' : '正在生成章节'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>
+                    {genTimedOut ? '请刷新页面查看结果' : `${formatElapsed(genElapsed)}`}
+                  </Text>
+                </div>
+              </div>
+              <Space size="small">
+                {!genTimedOut && (
+                  <Button size="small" danger icon={<CloseCircleOutlined />} onClick={handleCancelGen}>
+                    取消
+                  </Button>
+                )}
+                {genTimedOut && (
+                  <Button size="small" onClick={() => { setGenTimedOut(false); loadChapters() }}>
+                    刷新状态
+                  </Button>
+                )}
+              </Space>
+            </div>
+            {!genTimedOut && (
+              <>
+                <Progress
+                  percent={genProgress}
+                  strokeColor={{ from: '#6366f1', to: '#06b6d4' }}
+                  trailColor="#e0e7ff"
+                  size="small"
+                  format={() => `${genProgress}%`}
+                />
+                <div style={{ marginTop: 6, fontSize: 12, color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{genPhaseLabel(genProgress)}</span>
+                  <span>{generationStatus?.message || 'AI 正在创作中'}</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Toolbar */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <Space>
             <Tooltip title="批量生成多章，可设置数量和标题">
-              <Button icon={<ThunderboltOutlined />} onClick={() => {
+              <Button icon={<ThunderboltOutlined />} disabled={generating || batchRunning} onClick={() => {
                 setBatchCount(3)
                 setBatchStartFrom(chapters.length + 1)
                 setBatchTitles('')
@@ -148,30 +311,14 @@ export default function ChapterListPage() {
                 批量生成
               </Button>
             </Tooltip>
-            <Button type="primary" onClick={handleGenerate} loading={generating} disabled={generating} icon={<PlusOutlined />}>
+            <Button type="primary" onClick={handleGenerate} loading={generating} disabled={generating || batchRunning} icon={<PlusOutlined />}>
               {generating ? '生成中...' : '生成下一章'}
             </Button>
             <Button onClick={handleExportAll} icon={<ExportOutlined />}>导出全书</Button>
           </Space>
-          {generating && generationStatus && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: 'linear-gradient(135deg, #eef2ff, #f0fdfa)',
-              border: '1px solid #c7d2fe', borderRadius: 8, padding: '6px 12px',
-            }}>
-              <div style={{
-                width: 16, height: 16,
-                border: '2px solid #eef2ff', borderTopColor: '#6366f1',
-                borderRadius: '50%', animation: 'spin 0.8s linear infinite',
-              }} />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 12, color: '#4f46e5' }}>生成中</div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>{generationStatus?.message || 'AI 创作中'}</div>
-              </div>
-            </div>
-          )}
         </div>
 
+        {/* Chapter List or Empty State */}
         {chapters.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>📖</div>
@@ -214,12 +361,8 @@ export default function ChapterListPage() {
                   </div>
                 </div>
                 <Space size="small">
-                  <Button type="link" size="small" onClick={() => navigate(`/books/${bookId}/chapters/${ch.id}`)}>
-                    编辑
-                  </Button>
-                  <Button type="link" size="small" onClick={() => handleExportChapter(ch)}>
-                    导出
-                  </Button>
+                  <Button type="link" size="small" onClick={() => navigate(`/books/${bookId}/chapters/${ch.id}`)}>编辑</Button>
+                  <Button type="link" size="small" onClick={() => handleExportChapter(ch)}>导出</Button>
                 </Space>
               </div>
             ))}
@@ -227,36 +370,55 @@ export default function ChapterListPage() {
         )}
       </Card>
 
+      {/* Batch Generation Modal */}
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <ThunderboltOutlined style={{ color: '#6366f1' }} />
-            <span>批量生成章节</span>
+            <span>{batchRunning ? '批量生成中' : '批量生成章节'}</span>
           </div>
         }
         open={batchModalOpen}
         onCancel={() => !batchRunning && setBatchModalOpen(false)}
-        footer={[
-          <Button key="cancel" disabled={batchRunning} onClick={() => setBatchModalOpen(false)}>取消</Button>,
-          <Button key="gen" type="primary" loading={batchRunning} disabled={batchRunning}
-            onClick={handleBatchGenerate} icon={<ThunderboltOutlined />}>
-            {batchRunning ? `生成中 ${batchProgress.current}/${batchProgress.total}` : '开始批量生成'}
-          </Button>,
-        ]}
+        closable={!batchRunning}
+        maskClosable={!batchRunning}
+        footer={
+          batchRunning
+            ? [
+                <Button key="cancel" danger icon={<CloseCircleOutlined />} onClick={() => {
+                  setBatchCancel(true)
+                  message.info('正在取消...')
+                }}>
+                  取消剩余生成
+                </Button>,
+              ]
+            : [
+                <Button key="cancel" onClick={() => setBatchModalOpen(false)}>取消</Button>,
+                <Button key="gen" type="primary" onClick={handleBatchGenerate} icon={<ThunderboltOutlined />}>
+                  开始批量生成
+                </Button>,
+              ]
+        }
         width={520}
       >
         <div style={{ padding: '8px 0' }}>
           {batchRunning ? (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{
-                width: 48, height: 48, margin: '0 auto 16px',
-                border: '3px solid #eef2ff', borderTopColor: '#6366f1',
-                borderRadius: '50%', animation: 'spin 0.8s linear infinite',
-              }} />
-              <div style={{ fontWeight: 600, fontSize: 15, color: '#1e293b', marginBottom: 8 }}>
-                正在生成第 {batchProgress.current}/{batchProgress.total} 章
+            <div style={{ padding: '12px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <LoadingOutlined style={{ fontSize: 18, color: '#6366f1' }} />
+                <Text strong>
+                  正在生成第 {batchProgress.current}/{batchProgress.total} 章
+                </Text>
               </div>
-              <div style={{ fontSize: 13, color: '#64748b' }}>AI 正在创作中，请稍候...</div>
+              <Progress
+                percent={Math.round((batchProgress.current / batchProgress.total) * 100)}
+                strokeColor={{ from: '#6366f1', to: '#06b6d4' }}
+                trailColor="#e0e7ff"
+                format={() => `${batchProgress.current}/${batchProgress.total}`}
+              />
+              <div style={{ marginTop: 8, fontSize: 12, color: '#64748b' }}>
+                {batchCancel ? '正在等待当前生成完成后停止...' : 'AI 正在创作中，请稍候...'}
+              </div>
             </div>
           ) : (
             <Form layout="vertical">
