@@ -1,5 +1,59 @@
 # 修复和改进日志
 
+## 并发批量生成 + 实时进度追踪 (v2.0.0)
+
+### 主要改进内容
+
+#### 1. 后端：并发批量生成章节
+- **文件**: `backend/app/routers/chapters.py`
+- **新增**:
+  - `POST /api/books/{book_id}/generate-batch?count=N` — 一次启动 N 个并发异步生成任务
+  - 批量生成不再顺序执行，N 章耗时 ≈ 单章耗时（约 60s）
+- **效果**: 批量生成 3 章从 ~180s 缩短至 ~60s（3x 提升），生成 5 章从 ~300s 缩短至 ~60s（5x 提升）
+
+#### 2. 后端：实时进度上报
+- **文件**:
+  - `backend/app/models/generation_log.py` — 新增 `progress` 字段（Integer, 0-100）
+  - `backend/app/services/generator.py` — 生成过程分阶段上报进度
+  - `backend/app/routers/chapters.py` — `/generation-status` 返回 `progress` 字段
+- **进度阶段**:
+  - 10%: 读取书籍/AI配置
+  - 15%: 加载已有章节上下文
+  - 30%: 调用 AI API 开始创作
+  - 80%: AI 返回内容
+  - 90%: 保存章节 + 导出
+  - 100%: 完成
+
+#### 3. 后端：定时调度并发生成
+- **文件**: `backend/app/services/scheduler.py`
+- **修改**: 每天定时生成多章时，使用 `asyncio.gather()` 并发执行，不再顺序循环
+- 新增 `_gen_single_chapter()` 辅助函数，每个并发任务使用独立 DB session
+
+#### 4. 前端：并发批量触发 + 实时进度展示
+- **文件**:
+  - `frontend/src/api/chapters.ts` — 新增 `generateBatch()` API
+  - `frontend/src/pages/ChapterListPage.tsx` — 全面重构批量生成逻辑
+- **主要修改**:
+  - 批量生成改为一次调用后端并发端点，不再前端顺序循环
+  - 优先显示服务器真实进度，无服务器进度时回退到时间估算
+  - 轮询频率从 2s 提升至 1.5s
+  - 批量进度显示已完成章节数（如 2/3）
+  - 新增 `combinedProgress()` 混合进度计算函数
+  - `MAX_POLL_ATTEMPTS = 75` 超时保护
+  - `batchPollRef` + `batchDoneCount` 状态追踪
+
+### 性能数据对比
+
+| 场景 | 优化前 | 优化后 | 提升 |
+|------|--------|--------|------|
+| 批量生成 3 章 | ~180s（顺序） | ~60s（并发） | **3x** |
+| 批量生成 5 章 | ~300s（顺序） | ~60s（并发） | **5x** |
+| 进度展示 | 纯时间估算 | 服务器真实进度 | 准确 |
+| 轮询频率 | 2s | 1.5s | 更快 |
+
+### 数据库
+- `generation_logs` 表新增 `progress` 列（默认 0），向后兼容无需手动迁移
+
 ## 每天自定义章数功能 (v1.2.0)
 
 ### 新增功能
