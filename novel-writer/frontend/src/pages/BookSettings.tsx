@@ -2,14 +2,23 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   Card, Button, Form, Input, Select, Switch, TimePicker,
-  message, Spin, Row, Col, Space,
+  message, Spin, Row, Col, Space, InputNumber,
 } from 'antd'
 import {
   SettingOutlined, FileTextOutlined, LeftOutlined, SaveOutlined, ClockCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import customParseFormat from 'dayjs/plugin/customParseFormat'
 import { bookApi } from '../api/books'
 import { Book } from '../types'
+
+dayjs.extend(customParseFormat)
+
+function parseScheduleTime(val: string | undefined): dayjs.Dayjs | undefined {
+  if (!val) return undefined
+  if (val.includes(':')) return dayjs(val, 'HH:mm')
+  return dayjs(val + ':00', 'HH:mm')
+}
 
 export default function BookSettings() {
   const { bookId } = useParams()
@@ -26,7 +35,7 @@ export default function BookSettings() {
       form.setFieldsValue({
         ...resp.data,
         schedule_time: resp.data.schedule_enabled
-          ? dayjs(resp.data.schedule_time, 'HH:mm')
+          ? parseScheduleTime(resp.data.schedule_time)
           : undefined,
       })
     } catch (e: unknown) {
@@ -42,11 +51,12 @@ export default function BookSettings() {
     try {
       setSaving(true)
       const values = form.getFieldsValue()
+      const formattedTime = values.schedule_time
+        ? dayjs(values.schedule_time).format('HH:mm')
+        : '09:00'
       const data = {
         ...values,
-        schedule_time: values.schedule_time
-          ? dayjs(values.schedule_time).format('HH:mm')
-          : '09:00',
+        schedule_time: formattedTime,
       }
       await bookApi.update(Number(bookId), data)
       message.success('保存成功')
@@ -129,13 +139,8 @@ export default function BookSettings() {
                 </Col>
               </Row>
               <Form.Item name="daily_chapters" label="每日生成章节数">
-                <Select options={[
-                  { value: 1, label: '1 章' },
-                  { value: 2, label: '2 章' },
-                  { value: 3, label: '3 章' },
-                  { value: 5, label: '5 章' },
-                  { value: 10, label: '10 章' },
-                ]} style={{ width: 160 }} />
+                <InputNumber min={1} max={100} step={1} style={{ width: 160 }}
+                  placeholder="1" />
               </Form.Item>
             </Form>
           </Card>
