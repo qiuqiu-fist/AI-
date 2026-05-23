@@ -21,6 +21,7 @@ export interface ThemeConfig {
   characters?: Character[]
   world_setting?: string
   tone?: string
+  target_words?: number
 }
 
 export interface Character {
@@ -97,4 +98,5 @@ export interface SystemStatus {
   books_count: number
   chapters_count: number
   active_schedules: number
+  total_words?: number
 }

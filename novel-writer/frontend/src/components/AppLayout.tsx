@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { Layout, Tag } from 'antd'
+import { Layout, Tag, message } from 'antd'
 import {
   DashboardOutlined,
   BookOutlined,
   ApiOutlined,
   HistoryOutlined,
   SettingOutlined,
+  UnorderedListOutlined,
+  ReadOutlined,
+  EditOutlined,
 } from '@ant-design/icons'
+import { bookApi } from '../api/books'
+import { systemApi } from '../api/system'
 
 const { Sider, Content } = Layout
 
@@ -19,13 +24,19 @@ const menuItems = [
   { key: '/settings', icon: <SettingOutlined />, label: '设置' },
 ]
 
-const pageTitles: Record<string, { label: string; icon: React.ReactNode }> = {
-  '/dashboard': { label: '数据概览', icon: <DashboardOutlined /> },
-  '/books': { label: '我的项目', icon: <BookOutlined /> },
-  '/providers': { label: 'AI 来源管理', icon: <ApiOutlined /> },
-  '/history': { label: '生成历史', icon: <HistoryOutlined /> },
-  '/settings': { label: '系统设置', icon: <SettingOutlined /> },
+const pageTitles: Record<string, { label: string; icon: React.ReactNode; desc: string }> = {
+  '/dashboard': { label: '数据概览', icon: <DashboardOutlined />, desc: '查看所有项目和创作数据的统计摘要' },
+  '/books': { label: '我的项目', icon: <BookOutlined />, desc: '管理所有小说项目，从创建到完成的完整流程' },
+  '/providers': { label: 'AI 来源管理', icon: <ApiOutlined />, desc: '配置 AI 写作服务提供商和模型参数' },
+  '/history': { label: '生成历史', icon: <HistoryOutlined />, desc: '查看 AI 写作生成的完整记录' },
+  '/settings': { label: '系统设置', icon: <SettingOutlined />, desc: '管理应用配置、模板和偏好设置' },
 }
+
+const subNavItems = [
+  { key: 'list', icon: <UnorderedListOutlined />, label: '项目列表', path: '/books', matchLen: 1 },
+  { key: 'detail', icon: <ReadOutlined />, label: '项目详情', matchLen: 2 },
+  { key: 'editor', icon: <EditOutlined />, label: '章节编辑', matchLen: 3 },
+]
 
 export default function AppLayout() {
   const navigate = useNavigate()
@@ -33,24 +44,45 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [subTitle, setSubTitle] = useState('')
   const [subTag, setSubTag] = useState('')
+  const [stats, setStats] = useState({ books: '0', chapters: '0', words: '0' })
 
   const segments = location.pathname.split('/').filter(Boolean)
   const rootKey = '/' + segments[0]
-
   const currentPage = pageTitles[rootKey]
+  const inSubPage = rootKey === '/books' && segments.length >= 2
 
   useEffect(() => {
-    if (rootKey === '/books' && segments.length >= 2) {
-      setSubTitle(`项目 #${segments[1]}`)
-      setSubTag('二级页面')
-    } else if (rootKey === '/books' && segments.length >= 3) {
+    if (rootKey === '/books' && segments.length >= 3) {
       setSubTitle(`章节 #${segments[2]}`)
       setSubTag('三级页面')
+    } else if (rootKey === '/books' && segments.length >= 2) {
+      setSubTitle(`项目 #${segments[1]}`)
+      setSubTag('二级页面')
     } else {
       setSubTitle('')
       setSubTag('')
     }
   }, [location.pathname])
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [booksResp, statusResp] = await Promise.all([
+          bookApi.list(),
+          systemApi.status(),
+        ])
+        const books = booksResp.data
+        const status = statusResp.data
+        setStats({
+          books: String(status?.books_count || books.length),
+          chapters: String(status?.chapters_count || 0),
+          words: (status?.total_words || 0).toLocaleString(),
+        })
+      } catch {
+        message.error('加载统计数据失败')
+      }
+    })()
+  }, [])
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -137,7 +169,7 @@ export default function AppLayout() {
                   )}
                   <span style={{ fontSize: 16 }}>{item.icon}</span>
                   {!collapsed && <span>{item.label}</span>}
-                  {isSelected && !collapsed && rootKey === '/books' && segments.length >= 2 && (
+                  {isSelected && !collapsed && inSubPage && (
                     <span style={{
                       marginLeft: 'auto', fontSize: 11,
                       color: '#a5b4fc', opacity: 0.7,
@@ -147,45 +179,53 @@ export default function AppLayout() {
                   )}
                 </div>
 
-                {/* Sub-navigation for 我的项目 when expanded */}
-                {isSelected && !collapsed && rootKey === '/books' && segments.length >= 2 && (
+                {isSelected && !collapsed && inSubPage && (
                   <div style={{
-                    padding: '2px 0 4px 52px',
+                    padding: '4px 0 6px 52px',
                     display: 'flex', flexDirection: 'column', gap: 2,
                   }}>
-                    <div
-                      onClick={() => navigate('/books')}
-                      style={{
-                        padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
-                        fontSize: 13, color: segments.length === 1 ? '#c7d2fe' : '#9b97c4',
-                        background: segments.length === 1 ? 'rgba(99,102,241,0.15)' : 'transparent',
-                      }}
-                    >
-                      📋 项目列表
-                    </div>
-                    {segments.length >= 2 && (
-                      <div
-                        onClick={() => navigate(`/books/${segments[1]}`)}
-                        style={{
-                          padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
-                          fontSize: 13, color: segments.length === 2 ? '#c7d2fe' : '#9b97c4',
-                          background: segments.length === 2 ? 'rgba(99,102,241,0.15)' : 'transparent',
-                        }}
-                      >
-                        📖 项目详情
-                      </div>
-                    )}
-                    {segments.length >= 3 && (
-                      <div
-                        style={{
-                          padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
-                          fontSize: 13, color: '#c7d2fe',
-                          background: 'rgba(99,102,241,0.15)',
-                        }}
-                      >
-                        ✏️ 章节编辑
-                      </div>
-                    )}
+                    {subNavItems.map(sub => {
+                      const isSubActive = (
+                        (sub.matchLen === 1 && segments.length === 1) ||
+                        (sub.matchLen === 2 && segments.length === 2) ||
+                        (sub.matchLen === 3 && segments.length >= 3)
+                      )
+                      const showItem = (
+                        sub.matchLen === 1 ||
+                        (sub.matchLen === 2 && segments.length >= 2) ||
+                        (sub.matchLen === 3 && segments.length >= 3)
+                      )
+                      if (!showItem) return null
+                      return (
+                        <div
+                          key={sub.key}
+                          onClick={() => {
+                            if (sub.path) navigate(sub.path)
+                          }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8,
+                            padding: '6px 12px', borderRadius: 6, cursor: 'pointer',
+                            fontSize: 13,
+                            color: isSubActive ? '#c7d2fe' : '#9b97c4',
+                            background: isSubActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={e => {
+                            if (!isSubActive) {
+                              e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (!isSubActive) {
+                              e.currentTarget.style.background = 'transparent'
+                            }
+                          }}
+                        >
+                          <span style={{ fontSize: 13 }}>{sub.icon}</span>
+                          <span>{sub.label}</span>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -199,9 +239,9 @@ export default function AppLayout() {
             display: 'flex', gap: 8,
           }}>
             {[
-              { value: '0', label: '项目' },
-              { value: '0', label: '章节' },
-              { value: '0', label: '字数' },
+              { value: stats.books, label: '项目' },
+              { value: stats.chapters, label: '章节' },
+              { value: stats.words, label: '字数' },
             ].map(stat => (
               <div key={stat.label} style={{
                 flex: 1, padding: 8, borderRadius: 8,
@@ -216,7 +256,6 @@ export default function AppLayout() {
       </Sider>
       <Layout>
         <Content style={{ padding: 0, background: '#f5f5f5', display: 'flex', flexDirection: 'column' }}>
-          {/* Page Header */}
           {currentPage && (
             <div style={{
               padding: '20px 24px 0',
@@ -247,16 +286,14 @@ export default function AppLayout() {
                       </Tag>
                     )}
                   </div>
-                  {subTitle && (
-                    <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
-                      {subTitle}
-                    </div>
-                  )}
+                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
+                    {subTitle || currentPage.desc}
+                  </div>
                 </div>
               </div>
             </div>
           )}
-          <div style={{ padding: 24, flex: 1 }}>
+          <div className="page-content" style={{ padding: 24, flex: 1 }}>
             <Outlet />
           </div>
         </Content>

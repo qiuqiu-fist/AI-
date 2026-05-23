@@ -17,7 +17,7 @@ export default function BookDetail() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus | null>(null)
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [form] = Form.useForm()
 
   const loadBook = async () => {
