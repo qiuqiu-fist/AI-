@@ -179,7 +179,14 @@ export default function BookDetail() {
         <Card style={{ marginTop: 24, borderRadius: 10, background: '#fffbeb' }} bodyStyle={{ padding: '12px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#92400e' }}>
             <ClockCircleOutlined />
-            定时任务已启用 · 每日 {book.schedule_time || '09:00'} 自动生成 {book.daily_chapters || 1} 章
+            {(() => {
+              const mode = book.schedule_mode || 'daily'
+              const chapters = book.daily_chapters || 1
+              if (mode === 'daily') return `每日 ${book.schedule_time || '09:00'} 自动生成 ${chapters} 章`
+              if (mode === 'interval_days') return `每 ${book.schedule_interval || 1} 天 · ${book.schedule_time || '09:00'} 生成 ${chapters} 章`
+              if (mode === 'interval_minutes') return `每隔 ${book.schedule_interval || 30} 分钟生成 ${chapters} 章`
+              return ''
+            })()}
           </div>
         </Card>
       )}

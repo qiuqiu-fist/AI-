@@ -214,7 +214,14 @@ export default function Dashboard() {
                       <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, display: 'flex', gap: 16 }}>
                         <span>{book.theme_config?.target_words || '?'} 字/章</span>
                         {book.schedule_enabled && (
-                          <span>⏰ 每日 {book.schedule_time} · {book.daily_chapters || 1} 章</span>
+                          <span>⏰ {(() => {
+                            const mode = book.schedule_mode || 'daily'
+                            const ch = book.daily_chapters || 1
+                            if (mode === 'daily') return `每天 ${book.schedule_time} · ${ch} 章`
+                            if (mode === 'interval_days') return `每${book.schedule_interval || 1}天${book.schedule_time} · ${ch}章`
+                            if (mode === 'interval_minutes') return `每${book.schedule_interval || 30}分钟 · ${ch}章`
+                            return ''
+                          })()}</span>
                         )}
                       </div>
                     </div>
